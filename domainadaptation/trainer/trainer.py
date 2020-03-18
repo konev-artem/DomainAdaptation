@@ -6,8 +6,8 @@ class Trainer:
         pass
 
     def train(self, model, compute_loss, optimizer, train_generator, steps, callbacks=None):
-        batch_inp, batch_out = next(train_generator)
         for i in range(steps):
+            batch_inp, batch_out = next(train_generator)
             with tf.GradientTape() as tape:
                 loss = compute_loss(model, batch_inp, batch_out)
             grads = tape.gradient(loss, model.trainable_variables)
