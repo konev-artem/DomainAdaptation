@@ -25,11 +25,11 @@ class Experiment:
 
         input_size = (self.img_width, self.img_height, 3)
         if config["backbone"]["type"] == self.BackboneType.ALEXNET:
-            self.backbone = Alexnet(input_size)
+            self.backbone = Alexnet()
         elif config["backbone"]["type"] == self.BackboneType.VGG16:
-            self.backbone = Vgg16(input_size)
+            self.backbone = Vgg16()
         elif config["backbone"]["type"] == self.BackboneType.RESNET50:
-            self.backbone = Resnet50(input_size)
+            self.backbone = Resnet50()
         else:
             raise ValueError("Not supported backbone type")
 
@@ -45,27 +45,6 @@ class DANNExperiment(Experiment):
     Domain-Adversarial Training of Neural Networks
     link: https://arxiv.org/abs/1505.07818
     """
-
-    class GradReverse(keras.layers.Layer):  # куда этот слой ???
-        """
-        Gradient reversal layer
-        """
-
-        def __init__(self):
-            super().__init__()
-
-        @staticmethod
-        @tf.custom_gradient
-        def grad_reverse(x):
-            y = tf.identity(x)
-
-            def custom_grad(dy):
-                return -dy
-
-            return y, custom_grad
-
-        def call(self, x, **kwargs):
-            return self.grad_reverse(x)
 
     def __init__(self, config):
         super().__init__(config)
