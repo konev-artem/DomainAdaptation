@@ -46,7 +46,7 @@ class Tester:
 
         return accuracies
 
-    def bootstrap(accuracy, sz=1000, seed=42, ci_lvl=0.95, verbose=True):
+    def bootstrap(self, accuracy, sz=1000, seed=42, ci_lvl=0.95, verbose=True):
         np.random.seed(seed)
         bts = np.random.choice(accuracy, size=(sz, len(accuracy)), replace=True)
         bts = np.sort(np.mean(bts, 1))
