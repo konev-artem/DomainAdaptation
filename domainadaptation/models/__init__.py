@@ -1,5 +1,5 @@
 from .base_model import BaseModel
-from .blocks import ConvBlock, ResidualBlock
-from .resnet12 import Resnet12
+from .blocks import GradientReversal
+from .resnet101 import Resnet101
 
-__all_ = ['BaseModel', 'ConvBlock', 'ResidualBlock', 'Resnet12']
+__all_ = ['BaseModel', 'GradientReversal', 'Resnet101']
