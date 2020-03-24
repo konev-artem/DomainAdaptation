@@ -49,11 +49,10 @@ class Experiment:
 
         assert domain in [0, 1], "wrong domain number"
 
-        while True:
-            for X_batch, _ in generator:
-                y_batch = np.zeros(shape=(X_batch.shape[0], 2))
-                y_batch[:, domain] = 1
-                yield X_batch, tf.convert_to_tensor(y_batch)
+        for X_batch, _ in generator:
+            y_batch = np.zeros(shape=(X_batch.shape[0], 2))
+            y_batch[:, domain] = 1
+            yield X_batch, tf.convert_to_tensor(y_batch)
 
     @staticmethod
     def _get_classifier_head(num_classes):
