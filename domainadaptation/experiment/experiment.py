@@ -4,8 +4,9 @@ import numpy as np
 import tensorflow as tf
 import tensorflow.keras as keras
 
-from ..trainer import Trainer
 from ..tester import Tester
+from ..trainer import Trainer
+from ..visualizer import Visualizer
 from ..data_provider import DomainGenerator
 from ..models import Alexnet, Vgg16, Resnet50, Resnet101, GradientReversal
 
@@ -23,9 +24,6 @@ class Experiment:
     def __init__(self, config):
         self.config = config
 
-        self.img_width = config["dataset"]["img_width"]
-        self.img_height = config["dataset"]["img_height"]
-
         if config["backbone"]["type"] == self.BackboneType.ALEXNET:
             self.backbone = Alexnet().get_model()
         elif config["backbone"]["type"] == self.BackboneType.VGG16:
@@ -37,11 +35,25 @@ class Experiment:
         else:
             raise ValueError("Not supported backbone type")
 
-        self.domain_generator = DomainGenerator(
-            source_dir=config["source_dataset"],
-            target_dir=config["target_dataset"],
-            target_size=(self.img_width, self.img_height)
-        )
+        self.domain_generator = DomainGenerator(config["dataset"]["path"],
+                                                **config["dataset"]["augmentations"])
+
+    @staticmethod
+    def _cross_entropy(model, x_batch, y_batch):
+        logits = model(x_batch)
+        return tf.nn.softmax_cross_entropy_with_logits(y_batch, logits)
+
+    @staticmethod
+    def _domain_wrapper(generator, domain=0):
+        """ Changes y_batch from class labels to source/target domain label """
+
+        assert domain in [0, 1], "wrong domain number"
+
+        while True:
+            for X_batch, _ in generator:
+                y_batch = np.zeros(shape=(X_batch.shape[0], 2))
+                y_batch[:, domain] = 1
+                yield X_batch, tf.convert_to_tensor(y_batch)
 
     @staticmethod
     def _get_classifier_head(num_classes):
@@ -58,7 +70,7 @@ class DANNExperiment(Experiment):
         super().__init__(config)
 
         # -- create model --
-        classifier_head = self._get_classifier_head(num_classes=config["classes"])
+        classifier_head = self._get_classifier_head(num_classes=config["dataset"]["classes"])
         domain_head = self._get_classifier_head(num_classes=2)
         gradient_reversal_layer = GradientReversal(self._get_lambda())
 
@@ -71,26 +83,47 @@ class DANNExperiment(Experiment):
         )
 
     def __call__(self):
-        def cross_entropy(model, x_batch, y_batch):
-            y_one_hot = tf.one_hot(y_batch, depth=self.config["classes"])
-            logits = model(x_batch)
-            return tf.nn.softmax_cross_entropy_with_logits(y_one_hot, logits)
+
+        # -- initialization --
+        optimizer = keras.optimizers.Adam()
+        source_generator = self.domain_generator.make_generator(
+            domain=self.config["dataset"]["source"],
+            batch_size=self.config["batch_size"],
+            target_size=self.config["backbone"]["img-size"]
+        )
+        target_generator = self.domain_generator.make_generator(
+            domain=self.config["dataset"]["target"],
+            batch_size=self.config['batch_size'],
+            target_size=self.config["backbone"]["img-size"]
+        )
 
         # -- training strategy --
         trainer = Trainer()
-        adam = keras.optimizers.Adam()
         for _ in range(self.config["epochs"]):
-            trainer.train(model=self.model, compute_loss=cross_entropy, optimizer=adam,  # callbacks=''
-                          train_generator=self.domain_generator.source_generator(), steps=self.config["steps"])
+            # TODO add callbacks
+
+            for generator in [source_generator,
+                              self._domain_wrapper(source_generator, domain=0),
+                              self._domain_wrapper(target_generator, domain=1)]:
+                trainer.train(
+                    model=self.model,
+                    compute_loss=self._cross_entropy,
+                    optimizer=optimizer,  # the same optimizer ?
+                    train_generator=generator,
+                    steps=self.config["steps"]
+                )
+
+                # TODO somehow increase lambda in grad_rev_layer
 
         # -- evaluation --
         tester = Tester()
-        tester.test(self.model, self.domain_generator.target_generator())
+        tester.test(self.model, target_generator)
 
         # -- visualization --
-        pass
+        # visualizer = Visualizer(embeddings=X, domains=domains, labels=y)
+        # visualizer.visualize(size=75)
 
     @staticmethod
     def _get_lambda(p=0):
-        """ original lambda scheduler """
+        """ Original lambda scheduler """
         return 2 / (1 + np.exp(-10 * p)) - 1
