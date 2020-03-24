@@ -1,11 +1,13 @@
 from enum import Enum
 
+import numpy as np
 import tensorflow as tf
 import tensorflow.keras as keras
 
 from ..trainer import Trainer
-from ..models import Alexnet, Vgg16, Resnet50
+from ..tester import Tester
 from ..data_provider import DomainGenerator
+from ..models import Alexnet, Vgg16, Resnet50, Resnet101, GradientReversal
 
 
 class Experiment:
@@ -13,6 +15,7 @@ class Experiment:
         ALEXNET = "alexnet"
         VGG16 = "vgg16"
         RESNET50 = "resnet50"
+        RESNET101 = "resnet101"
 
         def __str__(self):
             return self.value
@@ -23,21 +26,26 @@ class Experiment:
         self.img_width = config["dataset"]["img_width"]
         self.img_height = config["dataset"]["img_height"]
 
-        input_size = (self.img_width, self.img_height, 3)
         if config["backbone"]["type"] == self.BackboneType.ALEXNET:
-            self.backbone = Alexnet()
+            self.backbone = Alexnet().get_model()
         elif config["backbone"]["type"] == self.BackboneType.VGG16:
-            self.backbone = Vgg16()
+            self.backbone = Vgg16().get_model()
         elif config["backbone"]["type"] == self.BackboneType.RESNET50:
-            self.backbone = Resnet50()
+            self.backbone = Resnet50().get_model()
+        elif config["backbone"]["type"] == self.BackboneType.RESNET101:
+            self.backbone = Resnet101().get_model()
         else:
             raise ValueError("Not supported backbone type")
 
         self.domain_generator = DomainGenerator(
-            source_dir=config["sourse_dataset"],
+            source_dir=config["source_dataset"],
             target_dir=config["target_dataset"],
             target_size=(self.img_width, self.img_height)
         )
+
+    @staticmethod
+    def _get_classifier_head(num_classes):
+        return keras.layers.Dense(units=num_classes)
 
 
 class DANNExperiment(Experiment):
@@ -50,9 +58,9 @@ class DANNExperiment(Experiment):
         super().__init__(config)
 
         # -- create model --
-        classifier_head = keras.layers.Dense(units=config["classes"])
-        domain_head = keras.layers.Dense(units=2)
-        gradient_reversal_layer = self.GradReverse()
+        classifier_head = self._get_classifier_head(num_classes=config["classes"])
+        domain_head = self._get_classifier_head(num_classes=2)
+        gradient_reversal_layer = GradientReversal(self._get_lambda())
 
         self.model = keras.Model(
             inputs=self.backbone.inputs,
@@ -63,23 +71,26 @@ class DANNExperiment(Experiment):
         )
 
     def __call__(self):
-        def cross_entropy(model, x_batch, y_batch):  # куда эту функцию ?
-            # y_batch one_hot or number of classes ???
-            return tf.nn.softmax_cross_entropy_with_logits(y_batch, model(x_batch))
+        def cross_entropy(model, x_batch, y_batch):
+            y_one_hot = tf.one_hot(y_batch, depth=self.config["classes"])
+            logits = model(x_batch)
+            return tf.nn.softmax_cross_entropy_with_logits(y_one_hot, logits)
 
-        # training strategy
+        # -- training strategy --
         trainer = Trainer()
-        trainer.train(
-            model=self.model,
-            compute_loss=cross_entropy,
-            optimizer=keras.optimizers.Adam(),
-            train_generator=self.domain_generator.source_generator(),
-            steps=self.config["steps"],
-            callbacks='???'  # какие колбэки используем, откуда их берем, где создаем ???
-        )
+        adam = keras.optimizers.Adam()
+        for _ in range(self.config["epochs"]):
+            trainer.train(model=self.model, compute_loss=cross_entropy, optimizer=adam,  # callbacks=''
+                          train_generator=self.domain_generator.source_generator(), steps=self.config["steps"])
 
-        # evaluation
-        # ???
+        # -- evaluation --
+        tester = Tester()
+        tester.test(self.model, self.domain_generator.target_generator())
 
-        # something else
-        # ???
+        # -- visualization --
+        pass
+
+    @staticmethod
+    def _get_lambda(p=0):
+        """ original lambda scheduler """
+        return 2 / (1 + np.exp(-10 * p)) - 1
