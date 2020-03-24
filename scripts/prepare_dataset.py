@@ -3,6 +3,7 @@ from os.path import join, exists, splitext
 
 import time
 from shutil import move, rmtree
+import platform
 
 
 class DatasetPreparer:
@@ -42,7 +43,11 @@ class OfficeHomePreparer(DatasetPreparer):
 
     def download_dataset(self):
         cookies_file = '/tmp/cookies.txt'
-        confirm_cmd_tmp = "wget --quiet --save-cookies {cookies_file} --keep-session-cookies --no-check-certificate 'https://docs.google.com/uc?export=download&id=0B81rNlvomiwed0V1YUxQdC1uOTg' -O- | gsed -rn 's/.*confirm=([0-9A-Za-z_]+).*/\\1\\n/p'".format(
+
+        sed = "gsed" if platform.system() == "Darwin" else "sed"
+
+        confirm_cmd_tmp = "wget --quiet --save-cookies {cookies_file} --keep-session-cookies --no-check-certificate 'https://docs.google.com/uc?export=download&id=0B81rNlvomiwed0V1YUxQdC1uOTg' -O- | {sed} -rn 's/.*confirm=([0-9A-Za-z_]+).*/\\1\\n/p'".format(
+            sed=sed,
             cookies_file=cookies_file)
         confirm_code_tmp = "$({confirm_cmd})".format(confirm_cmd=confirm_cmd_tmp)
         url = "https://docs.google.com/uc?export=download&confirm={confirm_code}&id=0B81rNlvomiwed0V1YUxQdC1uOTg".format(
@@ -71,7 +76,10 @@ class VisdaPreparer(DatasetPreparer):
 
         cookies_file = '/tmp/cookies.txt'
 
-        confirm_cmd_train = "wget --quiet --save-cookies {cookies_file} --keep-session-cookies --no-check-certificate 'https://docs.google.com/uc?export=download&id=0BwcIeDbwQ0XmdENwQ3R4TUVTMHc' -O- | gsed -rn 's/.*confirm=([0-9A-Za-z_]+).*/\\1\\n/p'".format(
+        sed = "gsed" if platform.system() == "Darwin" else "sed"
+
+        confirm_cmd_train = "wget --quiet --save-cookies {cookies_file} --keep-session-cookies --no-check-certificate 'https://docs.google.com/uc?export=download&id=0BwcIeDbwQ0XmdENwQ3R4TUVTMHc' -O- | {sed} -rn 's/.*confirm=([0-9A-Za-z_]+).*/\\1\\n/p'".format(
+            sed=sed,
             cookies_file=cookies_file)
         confirm_code_train = "$({confirm_cmd})".format(confirm_cmd=confirm_cmd_train)
         url = "https://docs.google.com/uc?export=download&confirm={confirm_code}&id=0BwcIeDbwQ0XmdENwQ3R4TUVTMHc".format(
@@ -81,7 +89,8 @@ class VisdaPreparer(DatasetPreparer):
         print("--------------DOWNLOADING TRAIN DATASET--------------")
         os.system(download_cmd_train)
 
-        confirm_cmd_valid = "wget --quiet --save-cookies {cookies_file} --keep-session-cookies --no-check-certificate 'https://docs.google.com/uc?export=download&id=0BwcIeDbwQ0XmUEVJRjl4Tkd4bTA' -O- | gsed -rn 's/.*confirm=([0-9A-Za-z_]+).*/\\1\\n/p'".format(
+        confirm_cmd_valid = "wget --quiet --save-cookies {cookies_file} --keep-session-cookies --no-check-certificate 'https://docs.google.com/uc?export=download&id=0BwcIeDbwQ0XmUEVJRjl4Tkd4bTA' -O- | {sed} -rn 's/.*confirm=([0-9A-Za-z_]+).*/\\1\\n/p'".format(
+            sed=sed,
             cookies_file=cookies_file)
         confirm_code_valid = "$({confirm_cmd})".format(confirm_cmd=confirm_cmd_valid)
         url = "https://docs.google.com/uc?export=download&confirm={confirm_code}&id=0BwcIeDbwQ0XmUEVJRjl4Tkd4bTA".format(
@@ -101,39 +110,46 @@ class VisdaPreparer(DatasetPreparer):
         os.system(tar_cmd)
         os.remove('{}/validation.tar'.format(self.dataset_dir))
 
+
 class DomainNetPreparer(DatasetPreparer):
     def __init__(self, dataset_name, dataset_root):
         super().__init__(dataset_name, dataset_root)
 
     def download_dataset(self):
-        #http://ai.bu.edu/M3SDA/
+        # http://ai.bu.edu/M3SDA/
         if os.path.exists(self.dataset_dir):
             rmtree(self.dataset_dir)
         os.makedirs(self.dataset_dir)
 
         cookies_file = '/tmp/cookies.txt'
 
-        download_cmd_clipart = "wget http://csr.bu.edu/ftp/visda/2019/multi-source/groundtruth/clipart.zip -O {}/clipart.zip".format(self.dataset_dir)
+        download_cmd_clipart = "wget http://csr.bu.edu/ftp/visda/2019/multi-source/groundtruth/clipart.zip -O {}/clipart.zip".format(
+            self.dataset_dir)
         print("--------------DOWNLOADING Clipart DATASET--------------")
         os.system(download_cmd_clipart)
 
-        download_cmd_infograph = "wget http://csr.bu.edu/ftp/visda/2019/multi-source/infograph.zip -O {}/infograph.zip".format(self.dataset_dir)
+        download_cmd_infograph = "wget http://csr.bu.edu/ftp/visda/2019/multi-source/infograph.zip -O {}/infograph.zip".format(
+            self.dataset_dir)
         print("--------------DOWNLOADING Infograph DATASET--------------")
         os.system(download_cmd_infograph)
 
-        download_cmd_painting = "wget http://csr.bu.edu/ftp/visda/2019/multi-source/groundtruth/painting.zip -O {}/painting.zip".format(self.dataset_dir)
+        download_cmd_painting = "wget http://csr.bu.edu/ftp/visda/2019/multi-source/groundtruth/painting.zip -O {}/painting.zip".format(
+            self.dataset_dir)
         print("--------------DOWNLOADING Painting DATASET--------------")
         os.system(download_cmd_painting)
 
-        download_cmd_quickdraw = "wget http://csr.bu.edu/ftp/visda/2019/multi-source/quickdraw.zip -O {}/quickdraw.zip".format(self.dataset_dir)
+        download_cmd_quickdraw = "wget http://csr.bu.edu/ftp/visda/2019/multi-source/quickdraw.zip -O {}/quickdraw.zip".format(
+            self.dataset_dir)
         print("--------------DOWNLOADING Quickdraw DATASET--------------")
         os.system(download_cmd_quickdraw)
 
-        download_cmd_real = "wget http://csr.bu.edu/ftp/visda/2019/multi-source/real.zip -O {}/real.zip".format(self.dataset_dir)
+        download_cmd_real = "wget http://csr.bu.edu/ftp/visda/2019/multi-source/real.zip -O {}/real.zip".format(
+            self.dataset_dir)
         print("--------------DOWNLOADING Real DATASET--------------")
         os.system(download_cmd_real)
 
-        download_cmd_sketch = "wget http://csr.bu.edu/ftp/visda/2019/multi-source/sketch.zip -O {}/sketch.zip".format(self.dataset_dir)
+        download_cmd_sketch = "wget http://csr.bu.edu/ftp/visda/2019/multi-source/sketch.zip -O {}/sketch.zip".format(
+            self.dataset_dir)
         print("--------------DOWNLOADING Sketch DATASET--------------")
         os.system(download_cmd_sketch)
 
@@ -160,6 +176,7 @@ def parse_args():
     args = parser.parse_args()
     return args
 
+
 if __name__ == '__main__':
     args = parse_args()
 
@@ -172,7 +189,7 @@ if __name__ == '__main__':
     elif args.dataset == 'domain_net':
         Preparer = DomainNetPreparer
     elif args.dataset == "digits":
-        #https://domainadaptation.org/api/salad.datasets.digits.html
+        # https://domainadaptation.org/api/salad.datasets.digits.html
         raise NotImplemented
     else:
         raise NotImplemented
