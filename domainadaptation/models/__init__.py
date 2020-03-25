@@ -1,5 +1,5 @@
 from .base_model import BaseModel
 from .blocks import GradientReversal
-from .resnet101 import Resnet101
+from .resnet101 import BaseFabric, Resnet101Fabric
 
-__all_ = ['BaseModel', 'GradientReversal', 'Resnet101']
+__all_ = ['BaseModel', 'GradientReversal', 'Resnet101Fabric', 'BaseFabric']
