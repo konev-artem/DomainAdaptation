@@ -1,4 +1,3 @@
-from .tester import test
+from .tester import Tester
 
-
-__all__ = ["test"]
+__all__ = ['Tester']
