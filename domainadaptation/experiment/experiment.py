@@ -8,7 +8,7 @@ from ..tester import Tester
 from ..trainer import Trainer
 from ..visualizer import Visualizer
 from ..data_provider import DomainGenerator
-from ..models import Alexnet, Vgg16, Resnet50, Resnet101, GradientReversal
+from ..models import Resnet101Fabric, GradientReversal
 
 
 class Experiment:
@@ -23,20 +23,36 @@ class Experiment:
 
     def __init__(self, config):
         self.config = config
+        
+        self._kwargs_for_backbone = {
+            'include_top': False,
+            'weights': config['backbone']['weights'],
+            'input_shape': (*config['backbone']['img-size'], 3),
+            'pooling': config['backbone']['pooling'],
+        }
 
         if config["backbone"]["type"] == self.BackboneType.ALEXNET:
-            self.backbone = Alexnet().get_model()
+            raise NotImplementedError
         elif config["backbone"]["type"] == self.BackboneType.VGG16:
-            self.backbone = Vgg16().get_model()
+            self._backbone_class = keras.applications.vgg16.VGG16
         elif config["backbone"]["type"] == self.BackboneType.RESNET50:
-            self.backbone = Resnet50().get_model()
+            self._backbone_class = keras.applications.resnet.ResNet50
         elif config["backbone"]["type"] == self.BackboneType.RESNET101:
-            self.backbone = Resnet101().get_model()
+            self._backbone_class = keras.applications.resnet.ResNet101
         else:
             raise ValueError("Not supported backbone type")
+            
 
         self.domain_generator = DomainGenerator(config["dataset"]["path"],
                                                 **config["dataset"]["augmentations"])
+    
+    def _get_new_backbone_instance(self, **kwargs):
+        if kwargs:
+            new_kwargs = self._kwargs_for_backbone.copy()
+            new_kwargs.update(kwargs)
+            return self._backbone_class(**new_kwargs)
+        else:
+            return self._backbone_class(**self._kwargs_for_backbone) 
 
     @staticmethod
     def _cross_entropy(model, x_batch, y_batch):
@@ -68,59 +84,42 @@ class DANNExperiment(Experiment):
     def __init__(self, config):
         super().__init__(config)
 
-        # -- create model --
-        classifier_head = self._get_classifier_head(num_classes=config["dataset"]["classes"])
-        domain_head = self._get_classifier_head(num_classes=2)
-        gradient_reversal_layer = GradientReversal(self._get_lambda())
-
-        self.model = keras.Model(
-            inputs=self.backbone.inputs,
-            outputs=[
-                classifier_head(self.backbone.outputs),
-                domain_head(gradient_reversal_layer(self.backbone.outputs))
-            ]
-        )
-
-    def __call__(self):
-
-        # -- initialization --
-        optimizer = keras.optimizers.Adam()
+    def experiment_no_domain_adaptation(self):
+        backbone = self._get_new_backbone_instance()
+        
+        classifier_head = self._get_classifier_head(num_classes=self.config["dataset"]["classes"])
+        
+        classification_model = keras.Model(
+            inputs=backbone.inputs,
+            outputs=classifier_head(backbone.outputs[0]))
+        
+        
         source_generator = self.domain_generator.make_generator(
             domain=self.config["dataset"]["source"],
             batch_size=self.config["batch_size"],
             target_size=self.config["backbone"]["img-size"]
         )
+        
+        trainer = Trainer()
+        optimizer = keras.optimizers.Adam()
+        
+        for i in range(self.config["epochs"]):
+            trainer.train(
+                model=classification_model,
+                compute_loss=self._cross_entropy,
+                optimizer=optimizer,
+                train_generator=source_generator,
+                steps=self.config["steps"])
+            print('epoch {} finished'.format(i + 1))
+        
+        
+        tester = Tester()        
         target_generator = self.domain_generator.make_generator(
             domain=self.config["dataset"]["target"],
-            batch_size=self.config['batch_size'],
+            batch_size=self.config["batch_size"],
             target_size=self.config["backbone"]["img-size"]
         )
-
-        # -- training strategy --
-        trainer = Trainer()
-        for _ in range(self.config["epochs"]):
-            # TODO add callbacks
-
-            for generator in [source_generator,
-                              self._domain_wrapper(source_generator, domain=0),
-                              self._domain_wrapper(target_generator, domain=1)]:
-                trainer.train(
-                    model=self.model,
-                    compute_loss=self._cross_entropy,
-                    optimizer=optimizer,  # the same optimizer ?
-                    train_generator=generator,
-                    steps=self.config["steps"]
-                )
-
-                # TODO somehow increase lambda in grad_rev_layer
-
-        # -- evaluation --
-        tester = Tester()
-        tester.test(self.model, target_generator)
-
-        # -- visualization --
-        # visualizer = Visualizer(embeddings=X, domains=domains, labels=y)
-        # visualizer.visualize(size=75)
+        tester.test(classification_model, target_generator)
 
     @staticmethod
     def _get_lambda(p=0):
