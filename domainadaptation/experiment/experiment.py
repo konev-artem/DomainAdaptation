@@ -54,9 +54,18 @@ class Experiment:
         if kwargs:
             new_kwargs = self._kwargs_for_backbone.copy()
             new_kwargs.update(kwargs)
-            return self._backbone_class(**new_kwargs)
+            instance = self._backbone_class(**new_kwargs)
         else:
-            return self._backbone_class(**self._kwargs_for_backbone) 
+            instance = self._backbone_class(**self._kwargs_for_backbone)
+        
+        assert self.config['backbone']['num_trainable_layers'] >= -1
+        assert isinstance(self.config['backbone']['num_trainable_layers'] >= -1, int)
+        if self.config['backbone']['num_trainable_layers'] != -1:
+            num_non_trainable_layers = len(instance.layers) - 1
+            for layer in instance.layers[:num_non_trainable_layers]:
+                layer.trainable = False
+        
+        return instance
 
     @staticmethod
     def _cross_entropy(model, x_batch, y_batch):
