@@ -8,7 +8,7 @@ from ..tester import Tester
 from ..trainer import Trainer
 from ..visualizer import Visualizer
 from ..data_provider import DomainGenerator
-from ..models import Resnet101Fabric, GradientReversal
+from ..models import GradientReversal
 
 
 class Experiment:
@@ -35,15 +35,19 @@ class Experiment:
             raise NotImplementedError
         elif config["backbone"]["type"] == self.BackboneType.VGG16:
             self._backbone_class = keras.applications.vgg16.VGG16
+            preprocess_input = keras.applications.vgg16.preprocess_input
         elif config["backbone"]["type"] == self.BackboneType.RESNET50:
             self._backbone_class = keras.applications.resnet.ResNet50
+            preprocess_input = keras.applications.resnet.preprocess_input
         elif config["backbone"]["type"] == self.BackboneType.RESNET101:
             self._backbone_class = keras.applications.resnet.ResNet101
+            preprocess_input = keras.applications.resnet.preprocess_input
         else:
             raise ValueError("Not supported backbone type")
             
 
         self.domain_generator = DomainGenerator(config["dataset"]["path"],
+                                                preprocessing_function=preprocess_input,
                                                 **config["dataset"]["augmentations"])
     
     def _get_new_backbone_instance(self, **kwargs):
@@ -113,13 +117,8 @@ class DANNExperiment(Experiment):
             print('epoch {} finished'.format(i + 1))
         
         
-        tester = Tester()        
-        target_generator = self.domain_generator.make_generator(
-            domain=self.config["dataset"]["target"],
-            batch_size=self.config["batch_size"],
-            target_size=self.config["backbone"]["img-size"]
-        )
-        tester.test(classification_model, target_generator)
+        tester = Tester()
+        tester.test(classification_model, source_generator)
 
     @staticmethod
     def _get_lambda(p=0):
