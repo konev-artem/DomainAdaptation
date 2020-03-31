@@ -27,7 +27,7 @@ class Experiment:
         self._kwargs_for_backbone = {
             'include_top': False,
             'weights': config['backbone']['weights'],
-            'input_shape': (*config['backbone']['img-size'], 3),
+            'input_shape': (*config['backbone']['img_size'], 3),
             'pooling': config['backbone']['pooling'],
         }
 
@@ -108,7 +108,7 @@ class DANNExperiment(Experiment):
         source_generator = self.domain_generator.make_generator(
             domain=self.config["dataset"]["source"],
             batch_size=self.config["batch_size"],
-            target_size=self.config["backbone"]["img-size"]
+            target_size=self.config["backbone"]["img_size"]
         )
 
         trainer = Trainer(
@@ -131,7 +131,7 @@ class DANNExperiment(Experiment):
         tester.test(classification_model, self.domain_generator.make_generator(
             domain=self.config["dataset"]["target"],
             batch_size=self.config["batch_size"],
-            target_size=self.config["backbone"]["img-size"]))
+            target_size=self.config["backbone"]["img_size"]))
 
     def experiment_domain_adaptation(self):
         ###################### MODEL
@@ -155,17 +155,17 @@ class DANNExperiment(Experiment):
         source_generator = self.domain_generator.make_generator(
             domain=self.config["dataset"]["source"],
             batch_size=self.config["batch_size"],
-            target_size=self.config["backbone"]["img-size"])
+            target_size=self.config["backbone"]["img_size"])
 
         domain_0_generator = self._domain_wrapper(self.domain_generator.make_generator(
             domain=self.config["dataset"]["source"],
             batch_size=self.config["batch_size"],
-            target_size=self.config["backbone"]["img-size"]), domain=0)
+            target_size=self.config["backbone"]["img_size"]), domain=0)
 
         domain_1_generator = self._domain_wrapper(self.domain_generator.make_generator(
             domain=self.config["dataset"]["target"],
             batch_size=self.config["batch_size"],
-            target_size=self.config["backbone"]["img-size"]), domain=1)
+            target_size=self.config["backbone"]["img_size"]), domain=1)
 
         trainer_classification = Trainer(
             model=classification_model,
@@ -183,9 +183,9 @@ class DANNExperiment(Experiment):
                     compute_loss=self._cross_entropy,
                     optimizer=optimizer,
                     train_generator=source_generator,
-                    steps=self.config["steps"])
+                    steps=source_generator.__len__)
             else:
-                for j in range(self.config["steps"]):
+                for j in range(max(domain_0_generator.__len__, domain_1_generator.__len__)):
                     trainer_domain.train(
                         compute_loss=self._cross_entropy,
                         optimizer=optimizer,
@@ -203,11 +203,11 @@ class DANNExperiment(Experiment):
 
         tester = Tester()
         tester.test(classification_model, self.domain_generator.make_generator(
-            domain=self.config["dataset"]["target"],
-            batch_size=self.config["batch_size"],
-            target_size=self.config["backbone"]["img-size"]))
+        domain=self.config["dataset"]["target"],
+        batch_size=self.config["batch_size"],
+        target_size=self.config["backbone"]["img_size"])) 
 
-    @staticmethod
+    @ staticmethod
     def _get_lambda(p=0):
         """ Original lambda scheduler """
         return 2 / (1 + np.exp(-10 * p)) - 1
