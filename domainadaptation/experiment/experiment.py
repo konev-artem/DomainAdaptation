@@ -183,9 +183,9 @@ class DANNExperiment(Experiment):
                     compute_loss=self._cross_entropy,
                     optimizer=optimizer,
                     train_generator=source_generator,
-                    steps=source_generator.__len__)
+                    steps=source_generator.__len__())
             else:
-                for j in range(max(domain_0_generator.__len__, domain_1_generator.__len__)):
+                for j in range(max(domain_0_generator.__len__(), domain_1_generator.__len__())):
                     trainer_domain.train(
                         compute_loss=self._cross_entropy,
                         optimizer=optimizer,
