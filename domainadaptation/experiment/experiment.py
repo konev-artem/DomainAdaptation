@@ -113,12 +113,13 @@ class DANNExperiment(Experiment):
             target_size=self.config["backbone"]["img-size"]
         )
         
-        trainer = Trainer()
+        trainer = Trainer(
+            model=classification_model,
+            grads_update_freq=self.config["grads_update_freq"])
         optimizer = keras.optimizers.Adam()
         
         for i in range(self.config["epochs"]):
             trainer.train(
-                model=classification_model,
                 compute_loss=self._cross_entropy,
                 optimizer=optimizer,
                 train_generator=source_generator,
@@ -170,27 +171,31 @@ class DANNExperiment(Experiment):
             batch_size=self.config["batch_size"],
             target_size=self.config["backbone"]["img-size"]), domain=1)
         
-        trainer = Trainer()
+        trainer_classification = Trainer(
+            model=classification_model,
+            grads_update_freq=self.config["grads_update_freq"])
+        
+        trainer_domain = Trainer(
+            model=domain_model,
+            grads_update_freq=self.config["grads_update_freq"])
+        
         optimizer = keras.optimizers.Adam()
         
         for i in range(self.config["epochs"]):
             if i % 2 == 0:
-                trainer.train(
-                    model=classification_model,
+                trainer_classification.train(
                     compute_loss=self._cross_entropy,
                     optimizer=optimizer,
                     train_generator=source_generator,
                     steps=self.config["steps"])
             else:
                 for j in range(self.config["steps"]):
-                    trainer.train(
-                        model=domain_model,
+                    trainer_domain.train(
                         compute_loss=self._cross_entropy,
                         optimizer=optimizer,
                         train_generator=domain_0_generator,
                         steps=1)
-                    trainer.train(
-                        model=domain_model,
+                    trainer_domain.train(
                         compute_loss=self._cross_entropy,
                         optimizer=optimizer,
                         train_generator=domain_1_generator,
