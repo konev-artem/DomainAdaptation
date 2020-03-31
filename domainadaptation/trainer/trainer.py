@@ -1,4 +1,5 @@
 import tensorflow as tf
+import tqdm
 
 
 class Trainer:
@@ -47,7 +48,7 @@ class Trainer:
             self._reset_accumulator()
 
     def train(self, compute_loss, optimizer, train_generator, steps, callbacks=None):
-        for i in range(steps):
+        for i in tqdm.trange(steps):
             batch_inp, batch_out = next(train_generator)
 
             with tf.GradientTape() as tape:

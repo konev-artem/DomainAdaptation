@@ -3,6 +3,7 @@ from enum import Enum
 import numpy as np
 import tensorflow as tf
 import tensorflow.keras as keras
+import tqdm
 
 from ..tester import Tester
 from ..trainer import Trainer
@@ -162,10 +163,12 @@ class DANNExperiment(Experiment):
             batch_size=self.config["batch_size"],
             target_size=self.config["backbone"]["img_size"]), domain=0)
 
-        domain_1_generator = self._domain_wrapper(self.domain_generator.make_generator(
+        target_generator = self.domain_generator.make_generator(
             domain=self.config["dataset"]["target"],
             batch_size=self.config["batch_size"],
-            target_size=self.config["backbone"]["img_size"]), domain=1)
+            target_size=self.config["backbone"]["img_size"])
+
+        domain_1_generator = self._domain_wrapper(target_generator, domain=1)
 
         trainer_classification = Trainer(
             model=classification_model,
@@ -185,7 +188,7 @@ class DANNExperiment(Experiment):
                     train_generator=source_generator,
                     steps=source_generator.__len__())
             else:
-                for j in range(max(domain_0_generator.__len__(), domain_1_generator.__len__())):
+                for j in range(max(source_generator.__len__(), target_generator.__len__())):
                     trainer_domain.train(
                         compute_loss=self._cross_entropy,
                         optimizer=optimizer,

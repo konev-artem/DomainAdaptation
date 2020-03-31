@@ -2,17 +2,17 @@ from domainadaptation.experiment import DANNExperiment
 import os
 
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"  # see issue #152
-os.environ["CUDA_VISIBLE_DEVICES"] = "7"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 if __name__ == '__main__':
-    dataset_path = '../../office_home/'
+    dataset_path = '/data/ensirkiza/office_home/'
     dataset_type = 'resnet50'
     source_domain = 'Art'
     weights = 'imagenet'
     pooling_type = 'max'
     num_trainable_layers = 8
     target_domain = 'Real World'
-    epochs = 2
+    epochs = 66
     img_size = (224, 224)
     num_classes = 65
     batch_size = 32
