@@ -34,6 +34,7 @@ if __name__ == '__main__':
                 'target': target_domain,
                 'augmentations': {},
             },
+        'grads_update_freq': 1,
         'batch_size': batch_size,
         'epochs': epochs,
     }
