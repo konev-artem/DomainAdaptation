@@ -1,13 +1,16 @@
-import sys
-sys.path.append('./..')
-sys.path.append('./../..')
+from domainadaptation.experiment import DANNExperiment
+import os
 
-from experiment import DANNExperiment
+os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"  # see issue #152
+os.environ["CUDA_VISIBLE_DEVICES"] = "7"
 
 if __name__ == '__main__':
     dataset_path = '../../office_home/'
-    dataset_type = 'resnet101'
+    dataset_type = 'resnet50'
     source_domain = 'Art'
+    weights = 'imagenet'
+    pooling_type = 'max'
+    num_trainable_layers = 8
     target_domain = 'Real World'
     epochs = 2
     img_size = (224, 224)
@@ -18,17 +21,23 @@ if __name__ == '__main__':
         'backbone':
             {
                 'type': dataset_type,
+                'num_trainable_layers': num_trainable_layers,
                 'img-size': img_size,
+                'weights': weights,
+                'pooling': pooling_type
             },
         'dataset':
             {
                 'path': dataset_path,
                 'classes': num_classes,
                 'source': source_domain,
-                'target': target_domain
+                'target': target_domain,
+                'augmentations': {},
             },
         'batch_size': batch_size,
         'epochs': epochs,
+        'steps': 4000 // batch_size
     }
+
     dann_experiment = DANNExperiment(config)
-    dann_experiment()
+    dann_experiment.experiment_domain_adaptation()
