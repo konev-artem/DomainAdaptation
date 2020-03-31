@@ -128,6 +128,84 @@ class DANNExperiment(Experiment):
         
         tester = Tester()
         tester.test(classification_model, source_generator)
+        
+        tester = Tester()
+        tester.test(classification_model, self.domain_generator.make_generator(
+            domain=self.config["dataset"]["target"],
+            batch_size=self.config["batch_size"],
+            target_size=self.config["backbone"]["img-size"]))
+
+
+    def experiment_domain_adaptation(self):
+        ###################### MODEL
+        backbone = self._get_new_backbone_instance()
+        
+        classifier_head = self._get_classifier_head(num_classes=self.config["dataset"]["classes"])
+        domain_head     = self._get_classifier_head(num_classes=2)
+        
+        classification_model = keras.Model(
+            inputs=backbone.inputs,
+            outputs=classifier_head(backbone.outputs[0]))
+        
+        lambda_ = tf.Variable(initial_value=1., trainable=False, dtype=tf.float32)
+        gradient_reversal_layer = GradientReversal(lambda_)
+        
+        domain_model = keras.Model(
+            inputs=backbone.inputs,
+            outputs=domain_head(gradient_reversal_layer(backbone.outputs[0])))
+        ######################
+        
+        source_generator = self.domain_generator.make_generator(
+            domain=self.config["dataset"]["source"],
+            batch_size=self.config["batch_size"],
+            target_size=self.config["backbone"]["img-size"])
+        
+        domain_0_generator = self._domain_wrapper(self.domain_generator.make_generator(
+            domain=self.config["dataset"]["source"],
+            batch_size=self.config["batch_size"],
+            target_size=self.config["backbone"]["img-size"]), domain=0)
+        
+        domain_1_generator = self._domain_wrapper(self.domain_generator.make_generator(
+            domain=self.config["dataset"]["target"],
+            batch_size=self.config["batch_size"],
+            target_size=self.config["backbone"]["img-size"]), domain=1)
+        
+        trainer = Trainer()
+        optimizer = keras.optimizers.Adam()
+        
+        for i in range(self.config["epochs"]):
+            if i % 2 == 0:
+                trainer.train(
+                    model=classification_model,
+                    compute_loss=self._cross_entropy,
+                    optimizer=optimizer,
+                    train_generator=source_generator,
+                    steps=self.config["steps"])
+            else:
+                for j in range(self.config["steps"]):
+                    trainer.train(
+                        model=domain_model,
+                        compute_loss=self._cross_entropy,
+                        optimizer=optimizer,
+                        train_generator=domain_0_generator,
+                        steps=1)
+                    trainer.train(
+                        model=domain_model,
+                        compute_loss=self._cross_entropy,
+                        optimizer=optimizer,
+                        train_generator=domain_1_generator,
+                        steps=1)
+            print('epoch {} finished'.format(i + 1))
+        
+        
+        tester = Tester()
+        tester.test(classification_model, source_generator)
+        
+        tester = Tester()
+        tester.test(classification_model, self.domain_generator.make_generator(
+            domain=self.config["dataset"]["target"],
+            batch_size=self.config["batch_size"],
+            target_size=self.config["backbone"]["img-size"]))
 
     @staticmethod
     def _get_lambda(p=0):
