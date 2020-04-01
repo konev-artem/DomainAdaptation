@@ -59,6 +59,25 @@ class OfficeHomePreparer(DatasetPreparer):
         os.rename(join(self.dataset_root, zip_name), self.dataset_dir)
         os.remove(self.dataset_dir + '.zip')
 
+class Office31Preparer(DatasetPreparer):
+    def __init__(self, dataset_name, dataset_root):
+        super().__init__(dataset_name, dataset_root)
+
+    def download_dataset(self):
+        cookies_file = '/tmp/cookies.txt'
+        confirm_cmd_tmp = "wget --quiet --save-cookies {cookies_file} --keep-session-cookies --no-check-certificate 'https://docs.google.com/uc?export=download&id=0B4IapRTv9pJ1WGZVd1VDMmhwdlE' -O- | gsed -rn 's/.*confirm=([0-9A-Za-z_]+).*/\\1\\n/p'".format(
+            cookies_file=cookies_file)
+        confirm_code_tmp = "$({confirm_cmd})".format(confirm_cmd=confirm_cmd_tmp)
+        url = "https://docs.google.com/uc?export=download&confirm={confirm_code}&id=0B4IapRTv9pJ1WGZVd1VDMmhwdlE".format(
+            confirm_code=confirm_code_tmp)
+        download_cmd_tmp = 'wget --load-cookies {cookies_file} "{url}" -O {dataset_dir}/dir.tar.gz && rm -rf {cookies_file}'.format(
+            url=url, dataset_dir=self.dataset_dir, cookies_file=cookies_file)
+        os.system(download_cmd_tmp)
+
+    def uncompress(self):
+        tar_cmd = "tar xvf {dataset_dir}/dir.tar.gz -C {dataset_dir}".format(dataset_dir=self.dataset_dir)
+        os.system(tar_cmd)
+        os.remove('{}/dir.tar.gz'.format(self.dataset_dir))
 
 class VisdaPreparer(DatasetPreparer):
     def __init__(self, dataset_name, dataset_root):
@@ -166,7 +185,7 @@ if __name__ == '__main__':
     if args.dataset == 'office_home':
         Preparer = OfficeHomePreparer
     elif args.dataset == 'office_31':
-        raise NotImplemented
+        Preparer = Office31Preparer
     elif args.dataset == 'visda_2017':
         Preparer = VisdaPreparer
     elif args.dataset == 'domain_net':
