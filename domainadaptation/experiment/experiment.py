@@ -250,13 +250,13 @@ class DANNExperiment(Experiment):
             for step_during_epoch in range(steps_per_epoch):
                 with tf.GradientTape() as tape:
                     X, y = next(source_generator)
-                    classification_loss = tf.nn.softmax_cross_entropy_with_logits(y, dann_model(X)[0])
+                    classification_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(y, dann_model(X)[0]))
 
                     X, y = next(domain_0_generator)
-                    domain_loss = tf.nn.softmax_cross_entropy_with_logits(y, dann_model(X)[1])
+                    domain_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(y, dann_model(X)[1]))
 
                     X, y = next(domain_1_generator)
-                    domain_loss = domain_loss + tf.nn.softmax_cross_entropy_with_logits(y, dann_model(X)[1])
+                    domain_loss = domain_loss + tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(y, dann_model(X)[1]))
                     
                     total_loss = classification_loss + domain_loss
                     
@@ -265,8 +265,23 @@ class DANNExperiment(Experiment):
                     
                     p_ = (steps_per_epoch * epoch_num + step_during_epoch) / (steps_per_epoch * self.config["epochs"])
                     lambda_.assign(DANNExperiment._get_lambda(p=p_))
-                    print('Mean loss:{}, lambda: {}'.format(tf.reduce_mean(total_loss), lambda_))
+                    if step_during_epoch % 10 == 0:
+                        print('Mean total loss:{}, lambda: {}'.format(total_loss, lambda_.numpy()))
+                        print('classification loss: {}, domain_loss: {}'.format(classification_loss, domain_loss))
+                        
+        #######################################################
+        classification_model = keras.Model(
+            inputs=dann_model.inputs,
+            outputs=dann_model.outputs[0])
         
+        tester = Tester()
+        tester.test(classification_model, source_generator)
+        
+        tester = Tester()
+        tester.test(classification_model, self.domain_generator.make_generator(
+            domain=self.config["dataset"]["target"],
+            batch_size=self.config["batch_size"],
+            target_size=self.config["backbone"]["img-size"]))
 
     @staticmethod
     def _get_lambda(p=0):
