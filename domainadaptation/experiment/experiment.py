@@ -61,7 +61,7 @@ class Experiment:
         assert self.config['backbone']['num_trainable_layers'] >= -1
         assert isinstance(self.config['backbone']['num_trainable_layers'] >= -1, int)
         if self.config['backbone']['num_trainable_layers'] != -1:
-            num_non_trainable_layers = len(instance.layers) - 1
+            num_non_trainable_layers = len(instance.layers) - self.config['backbone']['num_trainable_layers']
             for layer in instance.layers[:num_non_trainable_layers]:
                 layer.trainable = False
         
@@ -211,6 +211,62 @@ class DANNExperiment(Experiment):
             domain=self.config["dataset"]["target"],
             batch_size=self.config["batch_size"],
             target_size=self.config["backbone"]["img-size"]))
+    
+    def experiment_domain_adaptation_v2(self):
+        ### MODEL #############################################
+        backbone = self._get_new_backbone_instance()
+        
+        classifier_head = self._get_classifier_head(num_classes=self.config["dataset"]["classes"])
+        domain_head     = self._get_classifier_head(num_classes=2)
+        
+        lambda_ = tf.Variable(initial_value=1., trainable=False, dtype=tf.float32)
+        gradient_reversal_layer = GradientReversal(lambda_)
+        
+        dann_model = keras.Model(inputs=backbone.inputs, outputs=[
+            classifier_head(backbone.outputs[0]),
+            domain_head(gradient_reversal_layer(backbone.outputs[0]))
+        ])
+        #######################################################
+        
+        source_generator = self.domain_generator.make_generator(
+            domain=self.config["dataset"]["source"],
+            batch_size=self.config["batch_size"],
+            target_size=self.config["backbone"]["img-size"])
+        
+        domain_0_generator = self._domain_wrapper(self.domain_generator.make_generator(
+            domain=self.config["dataset"]["source"],
+            batch_size=self.config["batch_size"],
+            target_size=self.config["backbone"]["img-size"]), domain=0)
+        
+        domain_1_generator = self._domain_wrapper(self.domain_generator.make_generator(
+            domain=self.config["dataset"]["target"],
+            batch_size=self.config["batch_size"],
+            target_size=self.config["backbone"]["img-size"]), domain=1)
+        
+        
+        optimizer = keras.optimizers.Adam()
+        steps_per_epoch = len(source_generator)
+        for epoch_num in range(self.config["epochs"]):
+            for step_during_epoch in range(steps_per_epoch):
+                with tf.GradientTape() as tape:
+                    X, y = next(source_generator)
+                    classification_loss = tf.nn.softmax_cross_entropy_with_logits(y, dann_model(X)[0])
+
+                    X, y = next(domain_0_generator)
+                    domain_loss = tf.nn.softmax_cross_entropy_with_logits(y, dann_model(X)[1])
+
+                    X, y = next(domain_1_generator)
+                    domain_loss = domain_loss + tf.nn.softmax_cross_entropy_with_logits(y, dann_model(X)[1])
+                    
+                    total_loss = classification_loss + domain_loss
+                    
+                    grads = tape.gradient(total_loss, dann_model.trainable_variables)
+                    optimizer.apply_gradients(zip(grads, dann_model.trainable_variables))
+                    
+                    p_ = (steps_per_epoch * epoch_num + step_during_epoch) / (steps_per_epoch * self.config["epochs"])
+                    lambda_.assign(DANNExperiment._get_lambda(p=p_))
+                    print('Mean loss:{}, lambda: {}'.format(tf.reduce_mean(total_loss), lambda_))
+        
 
     @staticmethod
     def _get_lambda(p=0):
