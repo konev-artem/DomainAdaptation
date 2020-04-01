@@ -19,11 +19,14 @@ class DatasetPreparer:
     def uncompress(self):
         pass
 
+    def refactor(self):
+        pass
+
     def create_dataframe(self):
         pass
 
     def prepare_dataset(self):
-        print('Step 1 / 2: downloading dataset (this may take a while)...')
+        print('Step 1 / 3: downloading dataset (this may take a while)...')
         print('WARNING: all existing folders will be overwritten')
         for i in reversed(range(11)):
             print('New download starts in {:02d} s (press "^C" to exit)'.format(i), end='\r')
@@ -31,8 +34,11 @@ class DatasetPreparer:
         print()
         self.download_dataset()
 
-        print('Step 2 / 2: uncompressing dataset (this may take a while)...')
+        print('Step 2 / 3: uncompressing dataset (this may take a while)...')
         self.uncompress()
+
+        print('Step 3 / 3: refactoring dataset (this may take a while)...')
+        self.refactor()
 
         print('Completed')
 
@@ -63,6 +69,42 @@ class OfficeHomePreparer(DatasetPreparer):
             zf.extractall(self.dataset_root)
         os.rename(join(self.dataset_root, zip_name), self.dataset_dir)
         os.remove(self.dataset_dir + '.zip')
+
+class Office31Preparer(DatasetPreparer):
+    def __init__(self, dataset_name, dataset_root):
+        super().__init__(dataset_name, dataset_root)
+
+    def download_dataset(self):
+        cookies_file = '/tmp/cookies.txt'
+
+        sed = "gsed" if platform.system() == "Darwin" else "sed"
+
+        confirm_cmd_tmp = "wget --quiet --save-cookies {cookies_file} --keep-session-cookies --no-check-certificate 'https://docs.google.com/uc?export=download&id=0B4IapRTv9pJ1WGZVd1VDMmhwdlE' -O- | {sed} -rn 's/.*confirm=([0-9A-Za-z_]+).*/\\1\\n/p'".format(
+            sed=sed,
+            cookies_file=cookies_file)
+        confirm_code_tmp = "$({confirm_cmd})".format(confirm_cmd=confirm_cmd_tmp)
+        url = "https://docs.google.com/uc?export=download&confirm={confirm_code}&id=0B4IapRTv9pJ1WGZVd1VDMmhwdlE".format(
+            confirm_code=confirm_code_tmp)
+        download_cmd_tmp = 'wget --load-cookies {cookies_file} "{url}" -O {dataset_dir}.zip && rm -rf {cookies_file}'.format(
+            url=url, dataset_dir=self.dataset_dir, cookies_file=cookies_file)
+        os.system(download_cmd_tmp)
+
+    def uncompress(self):
+        tar_cmd = "tar xvf {dataset_dir}/office_31.zip -C {dataset_dir}".format(dataset_dir=self.dataset_root)
+        os.system(tar_cmd)
+        os.remove('{}/office_31.zip'.format(self.dataset_root))
+
+    def refactor(self):
+        domains = os.listdir(self.dataset_root)
+        for dom in domains:
+            dom_path = os.path.join(self.dataset_root, dom)
+            dom_path_img = os.path.join(dom_path, 'images')
+            for cls in os.listdir(dom_path_img):
+                os.replace(
+                    os.path.join(dom_path_img, cls),
+                    os.path.join(dom_path, cls)
+                )
+            os.rmdir(dom_path_img)
 
 
 class VisdaPreparer(DatasetPreparer):
@@ -183,7 +225,7 @@ if __name__ == '__main__':
     if args.dataset == 'office_home':
         Preparer = OfficeHomePreparer
     elif args.dataset == 'office_31':
-        raise NotImplemented
+        Preparer = Office31Preparer
     elif args.dataset == 'visda_2017':
         Preparer = VisdaPreparer
     elif args.dataset == 'domain_net':
