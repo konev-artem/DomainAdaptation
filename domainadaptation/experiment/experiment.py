@@ -212,7 +212,7 @@ class DANNExperiment(Experiment):
             batch_size=self.config["batch_size"],
             target_size=self.config["backbone"]["img-size"]))
     
-    def experiment_domain_adaptation_v2(self):
+    def experiment_domain_adaptation_v2(self, train_domain_head=True):
         ### MODEL #############################################
         backbone = self._get_new_backbone_instance()
         
@@ -252,13 +252,17 @@ class DANNExperiment(Experiment):
                     X, y = next(source_generator)
                     classification_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(y, dann_model(X)[0]))
 
-                    X, y = next(domain_0_generator)
-                    domain_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(y, dann_model(X)[1]))
+                    if train_domain_head:
+                        X, y = next(domain_0_generator)
+                        domain_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(y, dann_model(X)[1]))
 
-                    X, y = next(domain_1_generator)
-                    domain_loss = domain_loss + tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(y, dann_model(X)[1]))
+                        X, y = next(domain_1_generator)
+                        domain_loss = domain_loss + tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(y, dann_model(X)[1]))
                     
-                    total_loss = classification_loss + domain_loss
+                    if train_domain_head:
+                        total_loss = classification_loss + domain_loss
+                    else:
+                        total_loss = classification_loss
                     
                     grads = tape.gradient(total_loss, dann_model.trainable_variables)
                     optimizer.apply_gradients(zip(grads, dann_model.trainable_variables))
@@ -267,7 +271,8 @@ class DANNExperiment(Experiment):
                     lambda_.assign(DANNExperiment._get_lambda(p=p_))
                     if step_during_epoch % 10 == 0:
                         print('Mean total loss:{}, lambda: {}'.format(total_loss, lambda_.numpy()))
-                        print('classification loss: {}, domain_loss: {}'.format(classification_loss, domain_loss))
+                        if train_domain_head: 
+                            print('classification loss: {}, domain_loss: {}'.format(classification_loss, domain_loss))
                         
         #######################################################
         classification_model = keras.Model(
