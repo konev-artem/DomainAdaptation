@@ -19,14 +19,14 @@ class DatasetPreparer:
     def uncompress(self):
         pass
 
-    def refactor(self):
-        pass
-
     def create_dataframe(self):
         pass
 
+    def refactor(self):
+        pass
+
     def prepare_dataset(self):
-        print('Step 1 / 3: downloading dataset (this may take a while)...')
+        print('Step 1 / 2: downloading dataset (this may take a while)...')
         print('WARNING: all existing folders will be overwritten')
         for i in reversed(range(11)):
             print('New download starts in {:02d} s (press "^C" to exit)'.format(i), end='\r')
@@ -41,6 +41,43 @@ class DatasetPreparer:
         self.refactor()
 
         print('Completed')
+
+
+class Office31Preparer(DatasetPreparer):
+    def __init__(self, dataset_name, dataset_root):
+        super().__init__(dataset_name, dataset_root)
+
+    def download_dataset(self):
+        cookies_file = '/tmp/cookies.txt'
+
+        sed = "gsed" if platform.system() == "Darwin" else "sed"
+
+        confirm_cmd_tmp = "wget --quiet --save-cookies {cookies_file} --keep-session-cookies --no-check-certificate 'https://docs.google.com/uc?export=download&id=0B4IapRTv9pJ1WGZVd1VDMmhwdlE' -O- | {sed} -rn 's/.*confirm=([0-9A-Za-z_]+).*/\\1\\n/p'".format(
+            sed=sed,
+            cookies_file=cookies_file)
+        confirm_code_tmp = "$({confirm_cmd})".format(confirm_cmd=confirm_cmd_tmp)
+        url = "https://docs.google.com/uc?export=download&confirm={confirm_code}&id=0B4IapRTv9pJ1WGZVd1VDMmhwdlE".format(
+            confirm_code=confirm_code_tmp)
+        download_cmd_tmp = 'wget --load-cookies {cookies_file} "{url}" -O {dataset_dir}.zip && rm -rf {cookies_file}'.format(
+            url=url, dataset_dir=self.dataset_dir, cookies_file=cookies_file)
+        os.system(download_cmd_tmp)
+
+    def uncompress(self):
+        tar_cmd = "tar xvf {dataset_dir}/office_31.zip -C {dataset_dir}".format(dataset_dir=self.dataset_root)
+        os.system(tar_cmd)
+        os.remove('{}/office_31.zip'.format(self.dataset_root))
+
+    def refactor(self):
+        domains = os.listdir(self.dataset_root)
+        for dom in domains:
+            dom_path = os.path.join(self.dataset_root, dom)
+            dom_path_img = os.path.join(dom_path, 'images')
+            for cls in os.listdir(dom_path_img):
+                os.replace(
+                    os.path.join(dom_path_img, cls),
+                    os.path.join(dom_path, cls)
+                )
+            os.rmdir(dom_path_img)
 
 
 class OfficeHomePreparer(DatasetPreparer):
@@ -64,7 +101,6 @@ class OfficeHomePreparer(DatasetPreparer):
 
     def uncompress(self):
         import zipfile
-
         with zipfile.ZipFile(self.dataset_dir + '.zip', 'r') as zf:
             zip_name = zf.namelist()[0]
             zf.extractall(self.dataset_root)
@@ -106,47 +142,16 @@ class VisdaPreparer(DatasetPreparer):
             url=url, dataset_dir=self.dataset_dir, cookies_file=cookies_file)
         print("--------------DOWNLOADING VALIDATION DATASET--------------")
 
-        #os.system(download_cmd_valid)
+        os.system(download_cmd_valid)
 
     def uncompress(self):
         tar_cmd = "tar xvf {dataset_dir}/train.tar -C {dataset_dir}".format(dataset_dir=self.dataset_dir)
         os.system(tar_cmd)
         os.remove('{}/train.tar'.format(self.dataset_dir))
 
-
-        #tar_cmd = "tar xvf {dataset_dir}/validation.tar -C {dataset_dir}".format(dataset_dir=self.dataset_dir)
-        #os.system(tar_cmd)
-        #os.remove('{}/validation.tar'.format(self.dataset_dir))
-
-    def refactor(self):
-        from shutil import move
-
-        train_path = self.dataset_dir + os.sep + 'train'
-        destination_path = self.dataset_dir + os.sep + 'train_temp'
-        for dir_path, dirs, files in os.walk(train_path):
-            if dir_path == train_path:
-                continue
-
-            class_name = os.path.basename(dir_path)
-            for file in files:
-                if len(file) < 6 or file[:3] != 'src':
-                    raise ValueError()
-
-                src = file[:5]
-                destination_dir = destination_path + os.sep + src
-
-                if not os.path.exists(destination_dir):
-                    os.makedirs(destination_dir)
-
-                destination_dir += os.sep + class_name
-
-                if not os.path.exists(destination_dir):
-                    os.makedirs(destination_dir)
-
-                move(dir_path + os.sep + file, destination_dir)
-
-        rmtree(train_path)
-        os.rename(destination_path, train_path)
+        tar_cmd = "tar xvf {dataset_dir}/validation.tar -C {dataset_dir}".format(dataset_dir=self.dataset_dir)
+        os.system(tar_cmd)
+        os.remove('{}/validation.tar'.format(self.dataset_dir))
 
 
 class DomainNetPreparer(DatasetPreparer):
@@ -221,7 +226,7 @@ if __name__ == '__main__':
     if args.dataset == 'office_home':
         Preparer = OfficeHomePreparer
     elif args.dataset == 'office_31':
-        raise NotImplemented
+        Preparer = Office31Preparer
     elif args.dataset == 'visda_2017':
         Preparer = VisdaPreparer
     elif args.dataset == 'domain_net':
