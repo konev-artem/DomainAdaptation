@@ -29,8 +29,10 @@ class Tester:
             x_batch_test, y_batch_test = generator[index]
 
             logits = model(x_batch_test, training=False)
-
-            accuracy = np.mean(np.argmax(logits, axis=1) == y_batch_test)
+            try:
+                accuracy = np.mean(np.argmax(logits, axis=1) == y_batch_test.argmax(axis=1))
+            except IndexError:
+                accuracy = np.mean(np.argmax(logits, axis=1) == y_batch_test)
             accuracies.append(accuracy)
 
             tbar.set_description(
