@@ -1,4 +1,5 @@
 from enum import Enum
+import time
 
 import numpy as np
 import tensorflow as tf
@@ -87,6 +88,9 @@ class Experiment:
     def _get_classifier_head(num_classes):
         return keras.layers.Dense(units=num_classes)
 
+
+def print_callback(iteration, loss):
+    print(f"iteration: {iteration}, loss: {loss}")
 
 class DANNExperiment(Experiment):
     """
@@ -232,6 +236,11 @@ class DANNExperiment(Experiment):
             domain=self.config["dataset"]["source"],
             batch_size=self.config["batch_size"],
             target_size=self.config["backbone"]["img-size"])
+
+        target_generator = self.domain_generator.make_generator(
+            domain=self.config["dataset"]["target"],
+            batch_size=self.config["batch_size"],
+            target_size=self.config["backbone"]["img-size"])
         
         domain_0_generator = self._domain_wrapper(self.domain_generator.make_generator(
             domain=self.config["dataset"]["source"],
@@ -242,51 +251,55 @@ class DANNExperiment(Experiment):
             domain=self.config["dataset"]["target"],
             batch_size=self.config["batch_size"],
             target_size=self.config["backbone"]["img-size"]), domain=1)
+
+        classification_model = keras.Model(
+            inputs=dann_model.inputs,
+            outputs=dann_model.outputs[0])
+
+        tester = Tester()
         
-        
-        optimizer = keras.optimizers.Adam()
+        optimizer = keras.optimizers.Adam(lr=self.config['lr'])
         steps_per_epoch = len(source_generator)
         for epoch_num in range(self.config["epochs"]):
+            print(f"Starting epoch {epoch_num}", time.ctime())
+            mean_domain_loss = keras.metrics.MeanTensor()
+            mean_class_loss = keras.metrics.MeanTensor()
+            mean_total_loss = keras.metrics.MeanTensor()
             for step_during_epoch in range(steps_per_epoch):
                 with tf.GradientTape() as tape:
                     X, y = next(source_generator)
                     classification_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(y, dann_model(X)[0]))
-
+                    mean_class_loss.update_state(classification_loss)
                     if train_domain_head:
                         X, y = next(domain_0_generator)
                         domain_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(y, dann_model(X)[1]))
 
                         X, y = next(domain_1_generator)
                         domain_loss = domain_loss + tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(y, dann_model(X)[1]))
-                    
+
                     if train_domain_head:
+                        mean_domain_loss.update_state(classification_loss)
                         total_loss = classification_loss + domain_loss
                     else:
                         total_loss = classification_loss
+                    mean_total_loss.update_state(total_loss)
+                grads = tape.gradient(total_loss, dann_model.trainable_variables)
+                optimizer.apply_gradients(zip(grads, dann_model.trainable_variables))
                     
-                    grads = tape.gradient(total_loss, dann_model.trainable_variables)
-                    optimizer.apply_gradients(zip(grads, dann_model.trainable_variables))
-                    
-                    p_ = (steps_per_epoch * epoch_num + step_during_epoch) / (steps_per_epoch * self.config["epochs"])
-                    lambda_.assign(DANNExperiment._get_lambda(p=p_))
-                    if step_during_epoch % 10 == 0:
-                        print('Mean total loss:{}, lambda: {}'.format(total_loss, lambda_.numpy()))
-                        if train_domain_head: 
-                            print('classification loss: {}, domain_loss: {}'.format(classification_loss, domain_loss))
+                # p_ = (steps_per_epoch * epoch_num + step_during_epoch) / (steps_per_epoch * self.config["epochs"])
+                p_ = 1
+                lambda_.assign(DANNExperiment._get_lambda(p=p_))
+            print(f"Finished epoch {epoch_num}", time.ctime())
+            print('Mean total loss:{}, lambda: {}'.format(mean_total_loss.result().numpy(), lambda_.numpy()))
+            if train_domain_head:
+                print('classification loss: {}, domain_loss: {}'.format(mean_class_loss.result().numpy(), mean_domain_loss.result().numpy()))
+            print("Testing on source...")
+            tester.test(classification_model, source_generator)
+            print("Testing on target...")
+            tester.test(classification_model, target_generator)
                         
         #######################################################
-        classification_model = keras.Model(
-            inputs=dann_model.inputs,
-            outputs=dann_model.outputs[0])
-        
-        tester = Tester()
-        tester.test(classification_model, source_generator)
-        
-        tester = Tester()
-        tester.test(classification_model, self.domain_generator.make_generator(
-            domain=self.config["dataset"]["target"],
-            batch_size=self.config["batch_size"],
-            target_size=self.config["backbone"]["img-size"]))
+
 
     @staticmethod
     def _get_lambda(p=0):
