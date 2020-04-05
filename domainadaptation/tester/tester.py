@@ -10,20 +10,20 @@ class Tester:
     def __init__(self):
         pass
 
-    def test(self,
-             model,
-             generator,
-             model_name='baseline',
-             tensorboard=False,
+    def test(self, 
+             model, 
+             generator, 
+             model_name='baseline', 
+             tensorboard=False, 
              log_dir='../domainadaptation/logs'):
         if tensorboard:
             log_dir = os.path.join(log_dir,
-                                   '{}_{}'.format(model_name, datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S")))
+                '{}_{}'.format(model_name, datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S")))
             os.makedirs(log_dir, exist_ok=True)
             file_writer = tf.summary.FileWriter(log_dir)
 
         accuracies = []
-
+        
         tbar = tqdm.trange(generator.__len__())
         for index in tbar:
             x_batch_test, y_batch_test = generator[index]
