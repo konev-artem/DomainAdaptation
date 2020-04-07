@@ -3,6 +3,16 @@ from tensorflow.python.keras.layers import Layer
 from tensorflow.python.keras import backend as k
 
 
+@tf.custom_gradient
+def grad_reverse(x, lambda_):
+    y = tf.identity(x)
+
+    def custom_grad(dy):
+        return -lambda_ * dy
+
+    return y, custom_grad
+
+
 def reverse_gradient(x, l=1.0):
     positive_path = tf.stop_gradient(x * tf.cast(1 + l, tf.float32))
     negative_path = x * tf.cast(-l, tf.float32)
@@ -41,7 +51,7 @@ class GradientReversal(Layer):
         pass
 
     def call(self, x):
-        return reverse_gradient(x, self.alpha)
+        return grad_reverse(x, self.alpha)
 
     def compute_output_shape(self, input_shape):
         return input_shape
