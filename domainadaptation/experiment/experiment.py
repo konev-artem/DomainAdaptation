@@ -274,19 +274,23 @@ class DANNExperiment(Experiment):
                         if train_domain_head: 
                             print('classification loss: {}, domain_loss: {}'.format(classification_loss, domain_loss))
                         
-        #######################################################
-        classification_model = keras.Model(
-            inputs=dann_model.inputs,
-            outputs=dann_model.outputs[0])
-        
-        tester = Tester()
-        tester.test(classification_model, source_generator)
-        
-        tester = Tester()
-        tester.test(classification_model, self.domain_generator.make_generator(
-            domain=self.config["dataset"]["target"],
-            batch_size=self.config["batch_size"],
-            target_size=self.config["backbone"]["img-size"]))
+            #######################################################
+            classification_model = keras.Model(
+                inputs=dann_model.inputs,
+                outputs=dann_model.outputs[0])
+
+            tester = Tester()
+            accuracies = tester.test(classification_model, source_generator)
+
+            print("SOURCE ACCURACY ", np.mean(accuracies) * 100)
+
+            tester = Tester()
+            accuracies = tester.test(classification_model, self.domain_generator.make_generator(
+                domain=self.config["dataset"]["target"],
+                batch_size=self.config["batch_size"],
+                target_size=self.config["backbone"]["img-size"]))
+
+            print("TARGET ACCURACY ", np.mean(accuracies) * 100)
 
     @staticmethod
     def _get_lambda(p=0):
