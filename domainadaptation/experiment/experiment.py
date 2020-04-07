@@ -246,6 +246,8 @@ class DANNExperiment(Experiment):
         
         optimizer = keras.optimizers.Adam()
         steps_per_epoch = len(source_generator)
+        source_epoch_accuracy = []
+        target_epoch_accuracy = []
         for epoch_num in range(self.config["epochs"]):
             for step_during_epoch in range(steps_per_epoch):
                 with tf.GradientTape() as tape:
@@ -282,7 +284,9 @@ class DANNExperiment(Experiment):
             tester = Tester()
             accuracies = tester.test(classification_model, source_generator)
 
-            print("SOURCE ACCURACY ", np.mean(accuracies) * 100)
+            source_epoch_accuracy.append(np.mean(accuracies) * 100)
+
+            print("SOURCE ACCURACY ", source_epoch_accuracy[-1], " on epoch: ", epoch_num)
 
             tester = Tester()
             accuracies = tester.test(classification_model, self.domain_generator.make_generator(
@@ -290,7 +294,13 @@ class DANNExperiment(Experiment):
                 batch_size=self.config["batch_size"],
                 target_size=self.config["backbone"]["img-size"]))
 
-            print("TARGET ACCURACY ", np.mean(accuracies) * 100)
+            target_epoch_accuracy.append(np.mean(accuracies) * 100)
+
+            print("TARGET ACCURACY ", target_epoch_accuracy[-1], " on epoch: ", epoch_num)
+
+        print("MAX SOURCE ", np.max(source_epoch_accuracy))
+        print("MIN SOURCE ", np.max(target_epoch_accuracy))
+
 
     @staticmethod
     def _get_lambda(p=0):
