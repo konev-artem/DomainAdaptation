@@ -266,7 +266,7 @@ class DANNExperiment(Experiment):
                     grads = tape.gradient(total_loss, dann_model.trainable_variables)
 
                     if self.config["clip_grads"] != -1:
-                        grads, _ = tf.clip_by_global_norm(grads, self.config["clip_grads"])
+                        grads, current_grad_norm = tf.clip_by_global_norm(grads, self.config["clip_grads"])
 
                     optimizer.apply_gradients(zip(grads, dann_model.trainable_variables))
 
@@ -274,6 +274,7 @@ class DANNExperiment(Experiment):
                     lambda_.assign(DANNExperiment._get_lambda(p=p_))
                     if step_during_epoch % 50 == 0:
                         print('Mean total loss:{}, lambda: {}'.format(total_loss, lambda_.numpy()))
+                        print('Grad norm before clipping: {}'.format(current_grad_norm))
                         if train_domain_head:
                             print('classification loss: {}, domain_loss: {}'.format(classification_loss, domain_loss))
 
