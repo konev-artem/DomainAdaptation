@@ -49,13 +49,13 @@ class GradientReversal(Layer):
         super(GradientReversal, self).__init__(**kwargs)
         self._trainable = False
         self.alpha = alpha
+        self.grad_reverse = build_grad_reverse(self.alpha)
 
     def build(self, input_shape):
         pass
 
     def call(self, x):
-        grad_reverse = build_grad_reverse(self.alpha)
-        return grad_reverse(x)
+        return self.grad_reverse(x)
 
     def compute_output_shape(self, input_shape):
         return input_shape
