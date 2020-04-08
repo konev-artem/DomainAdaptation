@@ -13,13 +13,16 @@ if __name__ == '__main__':
             'num_trainable_layers': -1,
             'img-size': (224, 224),
             'weights': 'imagenet',
-            'pooling': 'max'},
+            'pooling': 'max'
+        },
         'dataset': {
             'classes': 12,
-            'path': '/content/office-home',
+            'path': '/content/visda',
             'augmentations': {},
             'source': 'train',
-            'target': 'validation'},
+            'target': 'validation'
+        },
+        'clip_grads': 2.0,
         'batch_size': 16,
         'epochs': 10,
     })
