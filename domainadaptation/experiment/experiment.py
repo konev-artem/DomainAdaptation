@@ -264,6 +264,10 @@ class DANNExperiment(Experiment):
                         total_loss = classification_loss
 
                     grads = tape.gradient(total_loss, dann_model.trainable_variables)
+
+                    if self.config["clip_grads"] != -1:
+                        grads, _ = tf.clip_by_global_norm(grads, self.config["clip_grads"])
+
                     optimizer.apply_gradients(zip(grads, dann_model.trainable_variables))
 
                     p_ = (steps_per_epoch * epoch_num + step_during_epoch) / (steps_per_epoch * self.config["epochs"])
