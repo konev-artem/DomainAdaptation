@@ -299,7 +299,7 @@ class DANNExperiment(Experiment):
             print("TARGET ACCURACY ", target_epoch_accuracy[-1], " on epoch: ", epoch_num)
 
         print("MAX SOURCE ", np.max(source_epoch_accuracy))
-        print("MIN SOURCE ", np.max(target_epoch_accuracy))
+        print("MAX TARGET ", np.max(target_epoch_accuracy))
 
 
     @staticmethod
