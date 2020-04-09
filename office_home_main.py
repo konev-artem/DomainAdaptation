@@ -1,8 +1,6 @@
 from domainadaptation.experiment import DANNExperiment
 import os
 
-os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"  # see issue #152
-os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 
 if __name__ == '__main__':
     domain_list = ['Art', 'Clipart', 'Product', 'Real World']
@@ -20,8 +18,6 @@ if __name__ == '__main__':
     for source_domain in domain_list:
         for target_domain in domain_list:
             if source_domain == target_domain:
-                continue
-            if source_domain == 'Clipart' and target_domain == 'Art':
                 continue
             config = {
                 'backbone':

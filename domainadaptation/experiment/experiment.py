@@ -272,7 +272,7 @@ class DANNExperiment(Experiment):
                     p_ = (steps_per_epoch * epoch_num + step_during_epoch) / (steps_per_epoch * self.config["epochs"])
                     lambda_.assign(DANNExperiment._get_lambda(p=p_))
                     if step_during_epoch % 10 == 0:
-                        print('Mean total loss:{}, lambda: {}'.format(total_loss, lambda_.numpy()))
+                        print('Mean total loss: {}, lambda: {}'.format(total_loss, lambda_.numpy()))
                         if train_domain_head: 
                             print('classification loss: {}, domain_loss: {}'.format(classification_loss, domain_loss))
                         
