@@ -85,7 +85,11 @@ class Experiment:
 
     @staticmethod
     def _get_classifier_head(num_classes):
-        return keras.layers.Dense(units=num_classes)
+        fc_1 = keras.layers.Dense(units=1024, activation='relu')
+        fc_2 = keras.layers.Dense(units=1024, activation='relu')
+        fc_3 = keras.layers.Dense(units=num_classes)
+
+        return fc_3(fc_2(fc_1))
 
 
 class DANNExperiment(Experiment):
@@ -241,7 +245,7 @@ class DANNExperiment(Experiment):
             batch_size=self.config["batch_size"],
             target_size=self.config["backbone"]["img-size"]), domain=1)
 
-        optimizer = keras.optimizers.Adam()
+        optimizer = keras.optimizers.Adam(learning_rate=self.config['learning_rate'])
         steps_per_epoch = len(source_generator)
 
         for epoch_num in range(self.config["epochs"]):

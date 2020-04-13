@@ -24,6 +24,7 @@ if __name__ == '__main__':
         },
         'clip_grads': 2.0,
         'batch_size': 16,
+        'learning_rate': 3e-4,
         'epochs': 10,
     })
 
