@@ -85,11 +85,12 @@ class Experiment:
 
     @staticmethod
     def _get_classifier_head(num_classes):
-        fc_1 = keras.layers.Dense(units=1024, activation='relu')
-        fc_2 = keras.layers.Dense(units=1024, activation='relu')
-        fc_3 = keras.layers.Dense(units=num_classes)
 
-        return fc_3(fc_2(fc_1))
+        return keras.models.Sequential([
+            keras.layers.Dense(units=1024, activation='relu'),
+            keras.layers.Dense(units=1024, activation='relu'),
+            keras.layers.Dense(units=num_classes)
+        ])
 
 
 class DANNExperiment(Experiment):
