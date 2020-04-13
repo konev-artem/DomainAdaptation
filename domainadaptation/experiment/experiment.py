@@ -58,7 +58,7 @@ class Experiment:
             instance = self._backbone_class(**self._kwargs_for_backbone)
 
         assert self.config['backbone']['num_trainable_layers'] >= -1
-        assert isinstance(self.config['backbone']['num_trainable_layers'] >= -1, int)
+        assert isinstance(self.config['backbone']['num_trainable_layers'], int)
 
         if self.config['backbone']['num_trainable_layers'] != -1:
             num_non_trainable_layers = len(instance.layers) - self.config['backbone']['num_trainable_layers']
@@ -85,6 +85,8 @@ class Experiment:
 
     @staticmethod
     def _get_classifier_head(num_classes):
+
+        # TODO: try weaker clf head for classifier head
 
         return keras.models.Sequential([
             keras.layers.Dense(units=1024, activation='relu'),
@@ -139,13 +141,12 @@ class DANNExperiment(Experiment):
             batch_size=self.config["batch_size"],
             target_size=self.config["backbone"]["img-size"]))
 
-
     def experiment_domain_adaptation(self):
         ###################### MODEL
         backbone = self._get_new_backbone_instance()
 
         classifier_head = self._get_classifier_head(num_classes=self.config["dataset"]["classes"])
-        domain_head     = self._get_classifier_head(num_classes=2)
+        domain_head = self._get_classifier_head(num_classes=2)
 
         classification_model = keras.Model(
             inputs=backbone.inputs,
@@ -205,7 +206,6 @@ class DANNExperiment(Experiment):
                         steps=1)
             print('epoch {} finished'.format(i + 1))
 
-
         tester = Tester()
         tester.test(classification_model, source_generator)
 
@@ -220,7 +220,7 @@ class DANNExperiment(Experiment):
         backbone = self._get_new_backbone_instance()
 
         classifier_head = self._get_classifier_head(num_classes=self.config["dataset"]["classes"])
-        domain_head     = self._get_classifier_head(num_classes=2)
+        domain_head = self._get_classifier_head(num_classes=2)
 
         lambda_ = tf.Variable(initial_value=0., trainable=False, dtype=tf.float32)
         gradient_reversal_layer = GradientReversal(lambda_)
@@ -261,7 +261,8 @@ class DANNExperiment(Experiment):
                         domain_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(y, dann_model(X)[1]))
 
                         X, y = next(domain_1_generator)
-                        domain_loss = domain_loss + tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(y, dann_model(X)[1]))
+                        domain_loss = domain_loss + tf.reduce_mean(
+                            tf.nn.softmax_cross_entropy_with_logits(y, dann_model(X)[1]))
 
                     if train_domain_head:
                         total_loss = classification_loss + (domain_loss / 2.)
@@ -277,9 +278,11 @@ class DANNExperiment(Experiment):
 
                     p_ = (steps_per_epoch * epoch_num + step_during_epoch) / (steps_per_epoch * self.config["epochs"])
                     lambda_.assign(DANNExperiment._get_lambda(p=p_))
+
                     if step_during_epoch % 50 == 0:
                         print('Mean total loss:{}, lambda: {}'.format(total_loss, lambda_.numpy()))
-                        print('Grad norm before clipping: {}'.format(current_grad_norm))
+                        if self.config["clip_grads"] != -1:
+                            print('Grad norm before clipping: {}'.format(current_grad_norm))
                         if train_domain_head:
                             print('classification loss: {}, domain_loss: {}'.format(classification_loss, domain_loss))
 
