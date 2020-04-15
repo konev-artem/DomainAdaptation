@@ -25,7 +25,7 @@ class Experiment:
         self._kwargs_for_backbone = {
             'include_top': False,
             'weights': config['backbone']['weights'],
-            'input_shape': (*config['backbone']['img-size'], 3),
+            'input_shape': (*config['backbone']['img_size'], 3),
             'pooling': config['backbone']['pooling'],
         }
 
