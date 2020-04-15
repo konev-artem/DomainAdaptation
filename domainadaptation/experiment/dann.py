@@ -3,8 +3,8 @@ import tensorflow as tf
 import tensorflow.keras as keras
 
 from domainadaptation.tester import Tester
-from domainadaptation.experiment import Experiment
 from domainadaptation.models import GradientReversal
+from domainadaptation.experiment.experiment import Experiment
 
 
 class DANNExperiment(Experiment):
