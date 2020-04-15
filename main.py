@@ -9,11 +9,11 @@ if __name__ == '__main__':
     logging.disable(logging.WARNING)
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-    exp = DANNExperiment(config={
+    experiment = DANNExperiment(config={
         'backbone': {
             'type': 'resnet50',
             'num_trainable_layers': 10,
-            'img-size': (224, 224),
+            'img_size': (224, 224),
             'weights': 'imagenet',
             'pooling': 'max'
         },
@@ -24,10 +24,9 @@ if __name__ == '__main__':
             'source': 'train',
             'target': 'validation'
         },
-        'clip_grads': -1,
         'batch_size': 16,
         'learning_rate': 3e-4,
-        'epochs': 10,
+        'epochs': 2,
     })
 
-    exp.experiment_domain_adaptation_v2()
+    experiment()
