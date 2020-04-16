@@ -1,39 +1,34 @@
 import tensorflow as tf
 from tensorflow.python.keras.layers import Layer
-from tensorflow.python.keras import backend as k
 
-def reverse_gradient(x, alpha):
-    '''Flips the sign of the incoming gradient during training.'''
-    try:
-        reverse_gradient.num_calls += 1
-    except AttributeError:
-        reverse_gradient.num_calls = 1
 
-    reverse_grad_name = "GradientReversal%d" % reverse_gradient.num_calls
+def build_grad_reverse(lambda_):
+    @tf.custom_gradient
+    def grad_reverse(x):
+        y = tf.identity(x)
 
-    @tf.RegisterGradient(reverse_grad_name)
-    def _flip_gradients(unused_op, grad):
-        return [tf.negative(grad) * alpha]
+        def custom_grad(dy):
+            return -lambda_ * dy
 
-    g = tf.compat.v1.get_default_graph()
-    with g.gradient_override_map({'Identity': reverse_grad_name}):
-        y = tf.identity(x, name='Identity')
+        return y, custom_grad
 
-    return y
+    return grad_reverse
+
 
 class GradientReversal(Layer):
-    '''Flip the sign of gradient during training.'''
+    """ Flip the sign of gradient during training. """
 
     def __init__(self, alpha, **kwargs):
         super(GradientReversal, self).__init__(**kwargs)
         self._trainable = False
         self.alpha = alpha
+        self.grad_reverse = build_grad_reverse(self.alpha)
 
     def build(self, input_shape):
         pass
 
-    def call(self, x):
-        return reverse_gradient(x, self.alpha)
+    def call(self, x, **kwargs):
+        return self.grad_reverse(x)
 
     def compute_output_shape(self, input_shape):
         return input_shape
