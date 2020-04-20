@@ -1,6 +1,7 @@
 import tensorflow as tf
 import sys
 import numpy as np
+import os
 
 
 imagenet_means = np.asarray([0.485, 0.456, 0.406], dtype=np.float32)
@@ -43,6 +44,7 @@ def AlexNet(input_shape=(227, 227, 3), weights='imagenet', include_top=False, **
     for k in kwargs.keys():
         sys.stderr.write("AlexNet will ignore parameter {}\n".format(k))
 
+    os.system('wget https://www.cs.toronto.edu/~guerzhoy/tf_alexnet/bvlc_alexnet.npy -nc -O bvlc_alexnet.npy')
     net_data = np.load("bvlc_alexnet.npy", encoding="latin1", allow_pickle=True).item()
 
     x = tf.keras.Input(shape=input_shape, dtype=tf.float32)
