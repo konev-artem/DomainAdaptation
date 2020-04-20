@@ -1,5 +1,6 @@
 from enum import Enum
 
+from domainadaptation.models.alexnet import AlexNet
 import numpy as np
 import tensorflow as tf
 import tensorflow.keras as keras
@@ -30,7 +31,8 @@ class Experiment:
         }
 
         if config["backbone"]["type"] == self.BackboneType.ALEXNET:
-            raise NotImplementedError
+            self._backbone_class = AlexNet
+            preprocess_input = id
         elif config["backbone"]["type"] == self.BackboneType.VGG16:
             self._backbone_class = keras.applications.vgg16.VGG16
             preprocess_input = keras.applications.vgg16.preprocess_input

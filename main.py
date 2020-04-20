@@ -11,8 +11,8 @@ if __name__ == '__main__':
 
     experiment = DANNExperiment(config={
         'backbone': {
-            'type': 'resnet50',
-            'num_trainable_layers': 10,
+            'type': 'alexnet',
+            'num_trainable_layers': 2,
             'img_size': (224, 224),
             'weights': 'imagenet',
             'pooling': 'max'

@@ -1,0 +1,50 @@
+from tensorflow.keras.models import Sequential, Model
+from tensorflow.keras.layers import Dense, Conv2D, Flatten, MaxPool2D, InputLayer
+
+
+class AlexNet(Model):
+    def __init__(self, **kwargs):
+        super(AlexNet, self).__init__()
+        self.model = Sequential()
+
+        # 1st Convolutional Layer
+        self.model.add(Conv2D(filters=96, input_shape=(227, 227, 3), kernel_size=(11, 11), strides=(4, 4), padding="valid",
+                         activation="relu"))
+
+        # Max Pooling
+        self.model.add(MaxPool2D(pool_size=(3, 3), strides=(2, 2), padding="valid"))
+
+        # 2nd Convolutional Layer
+        self.model.add(Conv2D(filters=256, kernel_size=(5, 5), strides=(1, 1), padding="same", activation="relu"))
+
+        # Max Pooling
+        self.model.add(MaxPool2D(pool_size=(3, 3), strides=(2, 2), padding="valid"))
+
+        # 3rd Convolutional Layer
+        self.model.add(Conv2D(filters=384, kernel_size=(3, 3), strides=(1, 1), padding="same", activation="relu"))
+
+        # 4th Convolutional Layer
+        self.model.add(Conv2D(filters=384, kernel_size=(3, 3), strides=(1, 1), padding="same", activation="relu"))
+
+        # 5th Convolutional Layer
+        self.model.add(Conv2D(filters=256, kernel_size=(3, 3), strides=(1, 1), padding="same", activation="relu"))
+
+        # Max Pooling
+        self.model.add(MaxPool2D(pool_size=(3, 3), strides=(2, 2), padding="valid"))
+
+        # Passing it to a Fully Connected layer
+        self.model.add(Flatten())
+        # 1st Fully Connected Layer
+        self.model.add(Dense(units=9216, activation="relu"))
+
+        # 2nd Fully Connected Layer
+        self.model.add(Dense(units=4096, activation="relu"))
+
+        # 3rd Fully Connected Layer
+        self.model.add(Dense(4096, activation="relu"))
+
+        self.inputs = self.model.inputs
+        self.outputs = self.model.outputs
+
+    def call(self, inputs):
+        return self.model(inputs)
