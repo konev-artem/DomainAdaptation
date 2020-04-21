@@ -1,5 +1,6 @@
-from tensorflow.keras.preprocessing.image import ImageDataGenerator
 import os
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+
 
 class DomainGenerator:
     # you can use image_data_generator_kwargs for augmentation
