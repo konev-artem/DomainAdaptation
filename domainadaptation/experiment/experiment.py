@@ -19,6 +19,8 @@ class Experiment:
         VGG16 = "vgg16"
         RESNET50 = "resnet50"
         RESNET101 = "resnet101"
+        MOBILENET = "mobilenet"
+        MOBILENETv2 = "mobilenetv2"
 
         def __str__(self):
             return self.value
@@ -45,6 +47,12 @@ class Experiment:
         elif config["backbone"]["type"] == self.BackboneType.RESNET101:
             self._backbone_class = keras.applications.resnet.ResNet101
             preprocess_input = keras.applications.resnet.preprocess_input
+        elif config["backbone"]["type"] == self.BackboneType.MOBILENET:
+            self._backbone_class = keras.applications.mobilenet.MobileNet
+            preprocess_input = keras.applications.mobilenet.preprocess_input
+        elif config["backbone"]["type"] == self.BackboneType.MOBILENETv2:
+            self._backbone_class = keras.applications.mobilenet_v2.MobileNetV2
+            preprocess_input = keras.applications.mobilenet_v2.preprocess_input
         else:
             raise ValueError("Not supported backbone type")
 
