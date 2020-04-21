@@ -1,5 +1,8 @@
 from domainadaptation.experiment import DANNExperiment
 
+import logging
+logging.getLogger('tensorflow').disabled = True
+
 def parse_args():
     import argparse
 
@@ -25,11 +28,11 @@ if __name__ == '__main__':
             'augmentations': {},
             'source': "amazon",
             'target': 'webcam'},
-        'batch_size': 16,
+        'batch_size': 8,
         'epochs': 10,
         'steps': 4000 // 16,
         'lr': 1e-4,
         'grads_update_freq': 1,
     })
 
-    exp.experiment_domain_adaptation_v2()
+    exp.experiment_domain_adaptation_v2(train_domain_head=True)

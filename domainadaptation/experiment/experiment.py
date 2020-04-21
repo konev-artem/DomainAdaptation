@@ -116,6 +116,8 @@ class DANNExperiment(Experiment):
             batch_size=self.config["batch_size"],
             target_size=self.config["backbone"]["img-size"]
         )
+
+        steps_per_epoch = len(source_generator)
         
         trainer = Trainer(
             model=classification_model,
@@ -216,7 +218,7 @@ class DANNExperiment(Experiment):
             batch_size=self.config["batch_size"],
             target_size=self.config["backbone"]["img-size"]))
     
-    def experiment_domain_adaptation_v2(self, train_domain_head=True):
+    def experiment_domain_adaptation_v2(self, train_domain_head=True, train_classification_head=True):
         ### MODEL #############################################
         backbone = self._get_new_backbone_instance()
         
@@ -267,21 +269,22 @@ class DANNExperiment(Experiment):
             mean_total_loss = keras.metrics.MeanTensor()
             for step_during_epoch in range(steps_per_epoch):
                 with tf.GradientTape() as tape:
-                    X, y = next(source_generator)
-                    classification_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(y, dann_model(X)[0]))
-                    mean_class_loss.update_state(classification_loss)
+                    total_loss = 0
+                    if train_classification_head:
+                        X, y = next(source_generator)
+                        classification_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(y, dann_model(X)[0]))
+                        mean_class_loss.update_state(classification_loss)
+                        total_loss += classification_loss
+
                     if train_domain_head:
                         X, y = next(domain_0_generator)
                         domain_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(y, dann_model(X)[1]))
 
                         X, y = next(domain_1_generator)
                         domain_loss = domain_loss + tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(y, dann_model(X)[1]))
+                        mean_domain_loss.update_state(domain_loss)
+                        total_loss += domain_loss
 
-                    if train_domain_head:
-                        mean_domain_loss.update_state(classification_loss)
-                        total_loss = classification_loss + domain_loss
-                    else:
-                        total_loss = classification_loss
                     mean_total_loss.update_state(total_loss)
                 grads = tape.gradient(total_loss, dann_model.trainable_variables)
                 optimizer.apply_gradients(zip(grads, dann_model.trainable_variables))
@@ -291,8 +294,10 @@ class DANNExperiment(Experiment):
                 lambda_.assign(DANNExperiment._get_lambda(p=p_))
             print(f"Finished epoch {epoch_num}", time.ctime())
             print('Mean total loss:{}, lambda: {}'.format(mean_total_loss.result().numpy(), lambda_.numpy()))
+            if train_classification_head:
+                print('classification loss: {}'.format(mean_class_loss.result().numpy()))
             if train_domain_head:
-                print('classification loss: {}, domain_loss: {}'.format(mean_class_loss.result().numpy(), mean_domain_loss.result().numpy()))
+                print('domain_loss: {}'.format(mean_domain_loss.result().numpy()))
             print("Testing on source...")
             tester.test(classification_model, source_generator)
             print("Testing on target...")
