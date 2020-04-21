@@ -1,4 +1,5 @@
 from enum import Enum
+import sys
 
 import numpy as np
 import tensorflow as tf
@@ -66,6 +67,14 @@ class Experiment:
             num_non_trainable_layers = len(instance.layers) - self.config['backbone']['num_trainable_layers']
             for layer in instance.layers[:num_non_trainable_layers]:
                 layer.trainable = False
+        
+        if 'freeze_all_batchnorms' in self.config['backbone'] and self.config['backbone']['freeze_all_batchnorms'] == True:
+            frozen_bn_cnt = 0
+            for layer in instance.layers:
+                if 'BatchNormalization' in str(type(layer)):
+                    frozen_bn_cnt += 1
+                    layer.trainable = False
+            sys.stderr.write('{} batchnorm layers from backbone are frozen.\n'.format(frozen_bn_cnt))
 
         return instance
 
