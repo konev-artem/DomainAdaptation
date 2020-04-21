@@ -8,6 +8,9 @@ from domainadaptation.trainer import Trainer
 from domainadaptation.visualizer import Visualizer
 from domainadaptation.data_provider import DomainGenerator
 
+import domainadaptation.models.alexnet
+from domainadaptation.models import AlexNet
+
 
 class Experiment:
     class BackboneType(str, Enum):
@@ -30,7 +33,8 @@ class Experiment:
         }
 
         if config["backbone"]["type"] == self.BackboneType.ALEXNET:
-            raise NotImplementedError
+            self._backbone_class = AlexNet
+            preprocess_input = domainadaptation.models.alexnet.proprocess_input
         elif config["backbone"]["type"] == self.BackboneType.VGG16:
             self._backbone_class = keras.applications.vgg16.VGG16
             preprocess_input = keras.applications.vgg16.preprocess_input
