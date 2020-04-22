@@ -24,9 +24,18 @@ if __name__ == '__main__':
             'source': 'train',
             'target': 'validation'
         },
-        'visualization': {
+        'visualizer': {
+            'method': 'tsne'
+        },
+        'visualize': {
+            'title': None,
+            'title_fontsize': 18,
+            'figsize': (12, 8),
+            'alpha': 1.0,
             'size': 75,
             'draw_legend': False,
+            'legend_fontsize': 16,
+            'draw_ticks': True,
             'filename': './visualization/visda/resnet50_with_domain_adaptation'
         },
         'batch_size': 16,
