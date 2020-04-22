@@ -19,7 +19,7 @@ if __name__ == '__main__':
         },
         'dataset': {
             'classes': 12,
-            'path': '/data/eikolodin/visda',
+            'path': '/data/jvchizh/datasets/visda',
             'augmentations': {},
             'source': 'train',
             'target': 'validation'
@@ -29,4 +29,4 @@ if __name__ == '__main__':
         'epochs': 2,
     })
 
-    experiment()
+    experiment(train_domain_head=True)
