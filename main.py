@@ -24,6 +24,11 @@ if __name__ == '__main__':
             'source': 'train',
             'target': 'validation'
         },
+        'visualization': {
+            'size': 75,
+            'draw_legend': False,
+            'filename': './visualization/visda/resnet50_with_domain_adaptation'
+        },
         'batch_size': 16,
         'learning_rate': 3e-4,
         'epochs': 2,

@@ -123,7 +123,9 @@ class DANNExperiment(Experiment):
                                np.ones(target_features.shape[0], dtype=int))),
             method='tsne'
         )
-        visualizer.visualize(size=75, filename='fig_with_adaptation', draw_legend=False)
+        visualizer.visualize(size=self.config['visualization']['size'],
+                             filename=self.config['visualization']['filename'],
+                             draw_legend=self.config['visualization']['draw_legend'])
 
     @staticmethod
     def _get_lambda(p=0):
