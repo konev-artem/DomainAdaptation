@@ -32,7 +32,7 @@ class Experiment:
 
         if config["backbone"]["type"] == self.BackboneType.ALEXNET:
             self._backbone_class = AlexNet
-            preprocess_input = id
+            preprocess_input = lambda x: x
         elif config["backbone"]["type"] == self.BackboneType.VGG16:
             self._backbone_class = keras.applications.vgg16.VGG16
             preprocess_input = keras.applications.vgg16.preprocess_input

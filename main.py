@@ -11,15 +11,15 @@ if __name__ == '__main__':
 
     experiment = DANNExperiment(config={
         'backbone': {
-            'type': 'alexnet',
-            'num_trainable_layers': 2,
+            'type': 'resnet50',
+            'num_trainable_layers': 10,
             'img_size': (224, 224),
             'weights': 'imagenet',
             'pooling': 'max'
         },
         'dataset': {
             'classes': 12,
-            'path': '/data/eikolodin/visda',
+            'path': '/data/jvchizh/datasets/visda',
             'augmentations': {},
             'source': 'train',
             'target': 'validation'
@@ -29,4 +29,4 @@ if __name__ == '__main__':
         'epochs': 2,
     })
 
-    experiment()
+    experiment(train_domain_head=True)
