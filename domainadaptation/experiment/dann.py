@@ -5,6 +5,8 @@ import tensorflow.keras as keras
 from domainadaptation.tester import Tester
 from domainadaptation.models import GradientReversal
 from domainadaptation.experiment.experiment import Experiment
+from domainadaptation.visualizer import Visualizer
+from domainadaptation.utils.utils import get_features_and_labels
 
 import time
 
@@ -63,7 +65,6 @@ class DANNExperiment(Experiment):
 
         for epoch_num in range(self.config["epochs"]):
             for step_during_epoch in range(steps_per_epoch):
-
                 with tf.GradientTape() as tape:
                     x_batch, y_batch = next(source_generator)
                     classification_loss = self._cross_entropy(dann_model, x_batch, y_batch, head=0)
@@ -88,7 +89,7 @@ class DANNExperiment(Experiment):
                     lambda_.assign(DANNExperiment._get_lambda(p=p_))
 
                     if step_during_epoch % 50 == 0:
-                        print('Mean total loss:{}, lambda: {}'.format(total_loss, lambda_.numpy()))
+                        print('Progress: {}\nmean total loss:{}, lambda: {}'.format(p_, total_loss, lambda_.numpy()))
                         if train_domain_head:
                             print('classification loss: {}, domain_loss: {}'.format(classification_loss, domain_loss))
 
@@ -100,16 +101,30 @@ class DANNExperiment(Experiment):
 
         tester = Tester()
         tester.test(classification_model, source_generator)
-
-        tester = Tester()
-        tester.test(
-            classification_model,
-            self.domain_generator.make_generator(
-                domain=self.config["dataset"]["target"],
-                batch_size=self.config["batch_size"],
-                target_size=self.config["backbone"]["img_size"]
-            )
+        
+        target_generator = self.domain_generator.make_generator(
+            domain=self.config["dataset"]["target"],
+            batch_size=self.config["batch_size"],
+            target_size=self.config["backbone"]["img_size"]
         )
+        tester = Tester()
+        tester.test(classification_model, target_generator)
+        
+        
+        #  --- visualize features from the last layer of backbone ---
+        source_features, source_labels = get_features_and_labels(backbone, source_generator, 50)
+        target_features, target_labels = get_features_and_labels(backbone, target_generator, 50)
+        
+        visualizer = Visualizer(
+            embeddings=np.vstack((source_features,
+                                  target_features)),
+            labels=np.hstack((source_labels,
+                              target_labels)),
+            domains=np.hstack((np.zeros(source_features.shape[0], dtype=int),
+                               np.ones(target_features.shape[0], dtype=int))),
+            method='tsne'
+        )
+        visualizer.visualize(size=75, filename='fig_with_adaptation', draw_legend=False)
 
     @staticmethod
     def _get_lambda(p=0):

@@ -1,6 +1,8 @@
 from enum import Enum
-import time
 
+import sys
+
+from domainadaptation.models.alexnet import AlexNet
 import numpy as np
 import tensorflow as tf
 import tensorflow.keras as keras
@@ -12,6 +14,7 @@ from domainadaptation.data_provider import DomainGenerator
 import domainadaptation.models.alexnet
 from domainadaptation.models import AlexNet
 
+import time
 
 class Experiment:
     class BackboneType(str, Enum):
@@ -19,6 +22,8 @@ class Experiment:
         VGG16 = "vgg16"
         RESNET50 = "resnet50"
         RESNET101 = "resnet101"
+        MOBILENET = "mobilenet"
+        MOBILENETv2 = "mobilenetv2"
 
         def __str__(self):
             return self.value
@@ -45,6 +50,12 @@ class Experiment:
         elif config["backbone"]["type"] == self.BackboneType.RESNET101:
             self._backbone_class = keras.applications.resnet.ResNet101
             preprocess_input = keras.applications.resnet.preprocess_input
+        elif config["backbone"]["type"] == self.BackboneType.MOBILENET:
+            self._backbone_class = keras.applications.mobilenet.MobileNet
+            preprocess_input = keras.applications.mobilenet.preprocess_input
+        elif config["backbone"]["type"] == self.BackboneType.MOBILENETv2:
+            self._backbone_class = keras.applications.mobilenet_v2.MobileNetV2
+            preprocess_input = keras.applications.mobilenet_v2.preprocess_input
         else:
             raise ValueError("Not supported backbone type")
 
@@ -67,6 +78,14 @@ class Experiment:
             num_non_trainable_layers = len(instance.layers) - self.config['backbone']['num_trainable_layers']
             for layer in instance.layers[:num_non_trainable_layers]:
                 layer.trainable = False
+        
+        if 'freeze_all_batchnorms' in self.config['backbone'] and self.config['backbone']['freeze_all_batchnorms'] == True:
+            frozen_bn_cnt = 0
+            for layer in instance.layers:
+                if 'BatchNormalization' in str(type(layer)):
+                    frozen_bn_cnt += 1
+                    layer.trainable = False
+            sys.stderr.write('{} batchnorm layers from backbone are frozen.\n'.format(frozen_bn_cnt))
 
         return instance
 

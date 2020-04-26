@@ -23,15 +23,24 @@ class Visualizer:
                                                 # more markers available at
                                                 # https://matplotlib.org/3.1.1/api/markers_api.html
                  
-                 colors=['r', 'b', 'm'],        # colors to scatter different labels
-                                                # first N_LABELS colors are used
-                                                # where N_LABELS is the number of different labels
-                                                # https://matplotlib.org/3.1.1/api/colors_api.html
+                 colors=['black',               # colors to scatter different labels
+                         'brown',               # first N_LABELS colors are used
+                         'red',                 # first N_LABELS colors are used
+                         'yellow',              # where N_LABELS is the number of different labels
+                         'green',               # https://matplotlib.org/3.1.1/api/colors_api.html
+                         'lightseagreen',
+                         'aqua',
+                         'dodgerblue',
+                         'darkblue',
+                         'blue',
+                         'orchid',
+                         'hotpink'],
                  
 
                  **kwargs                       # arguments to be passed into T-SNE/PCA constructor
                                                 # for example you n_jobs for T-SNE
                 ):
+        
         embeddings = np.asarray(embeddings)
         assert embeddings.ndim == 2, 'wrong embeddings shape'
         
