@@ -18,23 +18,23 @@ class CANExperiment(Experiment):
 
     def __call__(self):
         
-        np.random.seed(0)
+        np.random.seed(2)
         
-        n = 100
-        m = 50
-        n_features = 30
-        cls_num = 10
+        n = 23
+        m = 20
+        n_features = 10
+        cls_num = 6
         
-        out_s = 100 * tf.convert_to_tensor(np.random.rand(n, n_features))
+        out_s = tf.convert_to_tensor(np.random.rand(n, n_features), tf.float32)
         y_s = np.random.randint(0, cls_num, n)
-        out_t = tf.convert_to_tensor(np.random.rand(m, n_features))
+        out_t = tf.convert_to_tensor(np.random.rand(m, n_features), tf.float32)
         y_t = np.random.randint(0, cls_num, m)
         
         assert tf.unique(y_s)[0].shape[0] == cls_num and tf.unique(y_t)[0].shape[0] == cls_num
         
-        k_ss = self._kernel(out_s, out_s)
-        k_tt = self._kernel(out_t, out_t)
-        k_st = self._kernel(out_s, out_t)
+        k_ss = CANExperiment._kernel(out_s, out_s)
+        k_tt = CANExperiment._kernel(out_t, out_t)
+        k_st = CANExperiment._kernel(out_s, out_t)
         
         intra_disc = 0
         for c in range(cls_num):
@@ -71,8 +71,8 @@ class CANExperiment(Experiment):
             intra_disc += e1 + e2 - 2 * e3
             
         intra_disc /= cls_num
-        intra_disc_pred = self._get_class_discrepancy(out_s, tf.one_hot(y_s, cls_num),
-                                                      out_t, tf.one_hot(y_t, cls_num), intra=True)
+        intra_disc_pred = CANExperiment._get_class_discrepancy(out_s, tf.one_hot(y_s, cls_num),
+                                                               out_t, tf.one_hot(y_t, cls_num), intra=True)
         print(intra_disc, intra_disc_pred)
         assert np.allclose(intra_disc, intra_disc_pred)
         
@@ -114,16 +114,17 @@ class CANExperiment(Experiment):
                 inter_disc += e1 + e2 - 2 * e3
         
         inter_disc /= cls_num * (cls_num - 1)
-        inter_disc_pred = self._get_class_discrepancy(out_s, tf.one_hot(y_s, cls_num),
-                                                      out_t, tf.one_hot(y_t, cls_num), intra=False)
+        inter_disc_pred = CANExperiment._get_class_discrepancy(out_s, tf.one_hot(y_s, cls_num),
+                                                               out_t, tf.one_hot(y_t, cls_num), intra=False)
         print(inter_disc, inter_disc_pred)
         assert np.allclose(inter_disc, inter_disc_pred)
         
+    @staticmethod
+    def _kernel(out_1, out_2):
+        return tf.reduce_max(out_1, -1)[:, None] * tf.reduce_max(out_2, -1)[None]
     
-    def _kernel(self, out_1, out_2):
-        return tf.cast(tf.reduce_max(out_1, -1)[:, None] * tf.reduce_max(out_2, -1)[None], tf.float32)
-    
-    def _get_mask(self, labels_1, labels_2, intra=True):
+    @staticmethod
+    def _get_mask(labels_1, labels_2, intra=True):
         cls_num = tf.unique(labels_1)[0].shape[0]
         assert cls_num == tf.unique(labels_2)[0].shape[0], "Different number of classes in source and target domains"
         
@@ -131,33 +132,34 @@ class CANExperiment(Experiment):
         m = labels_2.shape[0]
         
         cls_mask = tf.tile(tf.unique(labels_1)[0][:, None, None], [1, n, m])
-        a = tf.cast(cls_mask == tf.tile(tf.tile(labels_1[:, None], [1, m])[None], [cls_num, 1, 1]), float)
-        b = tf.cast(cls_mask == tf.tile(tf.tile(labels_2[None], [n, 1])[None], [cls_num, 1, 1]), float)
+        a = tf.cast(cls_mask == tf.tile(tf.tile(labels_1[:, None], [1, m])[None], [cls_num, 1, 1]), tf.float32)
+        b = tf.cast(cls_mask == tf.tile(tf.tile(labels_2[None], [n, 1])[None], [cls_num, 1, 1]), tf.float32)
         
         if intra:
             return a * b
         else:
             return a[:, None] * b[None]
     
-    def _get_class_discrepancy(self, out_source, y_source, out_target, y_target, intra=True):
+    @staticmethod
+    def _get_class_discrepancy(out_source, y_source, out_target, y_target, intra=True):
         labels_source = tf.argmax(y_source, -1)
         labels_target = tf.argmax(y_target, -1)
         cls_num = len(tf.unique(labels_source)[0])
         
-        mask_ss = self._get_mask(labels_source, labels_source, intra=True)
-        mask_tt = self._get_mask(labels_target, labels_target, intra=True)
-        mask_st = self._get_mask(labels_source, labels_target, intra=intra)
+        mask_ss = CANExperiment._get_mask(labels_source, labels_source, intra=True)
+        mask_tt = CANExperiment._get_mask(labels_target, labels_target, intra=True)
+        mask_st = CANExperiment._get_mask(labels_source, labels_target, intra=intra)
         
         axs = None
         dim_coefs = [cls_num, 1, 1]
         
-        kernel_ss = tf.tile(self._kernel(out_source, out_source)[axs], dim_coefs)
-        kernel_tt = tf.tile(self._kernel(out_target, out_target)[axs], dim_coefs)
+        kernel_ss = tf.tile(CANExperiment._kernel(out_source, out_source)[axs], dim_coefs)
+        kernel_tt = tf.tile(CANExperiment._kernel(out_target, out_target)[axs], dim_coefs)
         
         if not intra:
             axs = (None, None)
             dim_coefs = [cls_num, cls_num, 1, 1]
-        kernel_st = tf.tile(self._kernel(out_source, out_target)[axs], dim_coefs)
+        kernel_st = tf.tile(CANExperiment._kernel(out_source, out_target)[axs], dim_coefs)
         
         e1s = tf.reduce_sum(mask_ss * kernel_ss, (-2, -1)) / tf.reduce_sum(mask_ss, (-2, -1))
         e2s = tf.reduce_sum(mask_tt * kernel_tt, (-2, -1)) / tf.reduce_sum(mask_tt, (-2, -1))
@@ -169,18 +171,26 @@ class CANExperiment(Experiment):
             return (tf.reduce_sum((cls_num - 1) * (e1s + e2s))\
                     - 2 * tf.reduce_sum(e3s - tf.eye(cls_num) * e3s)) / (cls_num * (cls_num - 1))
         
+    @staticmethod
+    def _cdd_loss(out_source, y_source, out_target, y_target):
+        return CANExperiment._get_class_discrepancy(out_source, y_source, out_target, y_target, intra=True)\
+            - CANExperiment._get_class_discrepancy(out_source, y_source, out_target, y_target, intra=False)
     
-    def _cdd_loss(self, out_source, y_source, out_target, y_target):
-        return self._get_class_discrepancy(out_source, y_source, out_target, y_target, intra=True)\
-            - self._get_class_discrepancy(out_source, y_source, out_target, y_target, intra=False)
-    
-    def _crossentropy_loss(self, y_source, y_target, from_logits=True):
+    @staticmethod
+    def _crossentropy_loss(y_source, y_target, from_logits=True):
         if from_logits:
             log_probs = tf.math.log(tf.nn.softmax(y_target, -1))
         else:
             log_probs = tf.math.log(y_target, -1)
         return -tf.reduce_mean(tf.reduce_sum(y_source * log_probs, -1))
 
-    def _loss(self, out_source, y_source, out_target, y_target, beta):
-        loss = self._crossentropy_loss(y_source, y_target)\
-            + beta * self._cdd_loss(out_source, y_source, out_target, y_target)
+    @staticmethod
+    def _loss(out_source, y_source, kmeans_labels_source,
+              out_target, y_target, kmeans_labels_target, beta, from_logits=True):
+        cls_num = tf.unique(kmeans_labels_source)[0].shape[0]
+        assert cls_num == tf.unique(kmeans_labels_target)[0].shape[0],\
+            "Different number of classes in source and target domains"
+        
+        loss = CANExperiment._crossentropy_loss(y_source, y_target, from_logits=from_logits)\
+            + beta * CANExperiment._cdd_loss(out_source, tf.one_hot(kmeans_labels_source, cls_num),
+                                             out_target, tf.one_hot(kmeans_labels_target, cls_num))
