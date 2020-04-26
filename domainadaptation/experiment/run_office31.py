@@ -1,4 +1,4 @@
-from domainadaptation.experiment import DANNExperiment
+from domainadaptation.experiment.dann import DANNExperimentOffice31
 
 import logging
 logging.getLogger('tensorflow').disabled = True
@@ -15,11 +15,11 @@ def parse_args():
 
 if __name__ == '__main__':
     args = parse_args()
-    exp = DANNExperiment(config={
+    config = {
         'backbone': {
             'type': 'resnet50',
             'num_trainable_layers': 7,
-            'img-size': (224, 224),
+            'img_size': (224, 224),
             'weights': 'imagenet',
             'pooling': 'max'},
         'dataset': {
@@ -30,9 +30,18 @@ if __name__ == '__main__':
             'target': 'webcam'},
         'batch_size': 8,
         'epochs': 10,
-        'steps': 4000 // 16,
-        'lr': 1e-4,
+        'learning_rate': 1e-4,
         'grads_update_freq': 1,
-    })
+    }
 
-    exp.experiment_domain_adaptation_v2(train_domain_head=True)
+    # config['dataset']['source'] = 'dslr'
+    # config['dataset']['target'] = 'webcam'
+    print(f"Run {config['dataset']['source']} -> {config['dataset']['target']}")
+    exp = DANNExperimentOffice31(config=config)
+    exp(train_domain_head=True)
+
+    config['dataset']['source'] = 'webcam'
+    config['dataset']['target'] = 'dslr'
+    print(f"Run {config['dataset']['source']} -> {config['dataset']['target']}")
+    exp = DANNExperimentOffice31(config=config)
+    exp(train_domain_head=True)
