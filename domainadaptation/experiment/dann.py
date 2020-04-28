@@ -4,9 +4,9 @@ import tensorflow.keras as keras
 
 from domainadaptation.tester import Tester
 from domainadaptation.models import GradientReversal
-from domainadaptation.experiment.experiment import Experiment
+from domainadaptation.experiment import Experiment
 from domainadaptation.visualizer import Visualizer
-from domainadaptation.utils.utils import get_features_and_labels
+from domainadaptation.utils import get_features_and_labels
 
 
 class DANNExperiment(Experiment):
@@ -121,9 +121,9 @@ class DANNExperiment(Experiment):
                               target_labels)),
             domains=np.hstack((np.zeros(source_features.shape[0], dtype=int),
                                np.ones(target_features.shape[0], dtype=int))),
-            method='tsne'
+            **self.config['visualizer']
         )
-        visualizer.visualize(size=75, filename='fig_with_adaptation', draw_legend=False)
+        visualizer.visualize(**self.config['visualize'])
 
     @staticmethod
     def _get_lambda(p=0):
