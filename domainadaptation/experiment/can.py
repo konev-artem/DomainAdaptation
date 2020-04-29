@@ -18,7 +18,7 @@ class CANExperiment(Experiment):
 
     def __call__(self):
         pass
-        
+
     @staticmethod
     def _kernel(out_1, out_2, sigma=1.):
         norm = tf.reduce_sum((out_1[:, None] - out_2[None]) ** 2, -1)
