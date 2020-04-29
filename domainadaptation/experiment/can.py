@@ -86,10 +86,7 @@ class CANExperiment(Experiment):
     @staticmethod
     def _loss(out_source, y_true_source, logits_source,
               out_target, labels_kmeans_target, beta, from_logits=True):
-        cls_num = tf.unique(kmeans_labels_source)[0].shape[0]
-        assert cls_num == tf.unique(kmeans_labels_target)[0].shape[0],\
-            "Different number of classes in source and target domains"
-        
         labels_true_source = tf.argmax(y_true_source, -1)
         loss = CANExperiment._crossentropy_loss(y_true_source, logits_source, from_logits=from_logits)\
             + beta * CANExperiment._cdd_loss(out_source, labels_true_source, out_target, labels_kmeans_target)
+        return loss
