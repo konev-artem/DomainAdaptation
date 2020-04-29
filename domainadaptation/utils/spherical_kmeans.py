@@ -39,6 +39,7 @@ class SphericalKMeans:
     def __update_centers(self):
         for class_ix in range(self.__centers.shape[0]):
             self.__centers[class_ix] = np.sum(self.__X[self.__labels == class_ix], axis=0)
+        self.__centers = self.__centers / np.linalg.norm(self.__centers, axis=1, keepdims=True)
 
     def __should_stop(self):
         if self.__prev_centers is None:
