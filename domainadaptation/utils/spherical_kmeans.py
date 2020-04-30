@@ -31,7 +31,7 @@ class SphericalKMeans:
                 convergence = True
                 break
 
-        return self.__labels, convergence
+        return self.__labels, self.__centers, convergence
 
     def __update_labels(self):
         pairwise_distances = (1 - np.matmul(self.__X, self.__centers.T))  # [objects, centers]
