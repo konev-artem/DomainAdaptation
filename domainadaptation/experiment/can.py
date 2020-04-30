@@ -2,13 +2,16 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 import tensorflow.keras as keras
+import sys
 
 from domainadaptation.tester import Tester
 from domainadaptation.models import GradientReversal
 from domainadaptation.experiment import Experiment
 from domainadaptation.visualizer import Visualizer
+from domainadaptation.utils import SphericalKMeans
 
 from tqdm import trange
+
 
 class CANExperiment(Experiment):
     '''https://arxiv.org/abs/1901.00976'''
@@ -17,7 +20,91 @@ class CANExperiment(Experiment):
         super().__init__(config)
 
     def __call__(self):
-        pass
+        backbone = self._get_new_backbone_instance()
+        fc1 = keras.layers.Dense(1024, activation='relu')(backbone.outputs[0])
+        fc2 = keras.layers.Dense(512, activation='relu')(fc1)
+        fc3 = keras.layers.Dense(256, activation='relu')(fc2)
+        fc4 = keras.layers.Dense(128, activation='relu')(fc3)
+        fc5 = keras.layers.Dense(self.config['dataset']['classes'])(fc4)
+
+        model = keras.Model(inputs=backbone.inputs, outputs=backbone.outputs + [fc1, fc2, fc3, fc4, fc5])
+
+        source_generator = self.domain_generator.make_generator(
+            domain=self.config["dataset"]["source"],
+            batch_size=self.config["batch_size"],
+            target_size=self.config["backbone"]["img_size"]
+        )
+
+        target_generator = self.domain_generator.make_generator(
+            domain=self.config["dataset"]["target"],
+            batch_size=self.config["batch_size"],
+            target_size=self.config["backbone"]["img_size"]
+        )
+
+        self.__perform_can_loop(
+            source_generator=source_generator,
+            target_generator=target_generator,
+            model=model,
+            K=10)
+
+    def __perform_can_loop(self, source_generator, target_generator, model, K):
+        centers = self.__estimate_centers_init(source_generator=source_generator, model=model)
+
+        target_y_kmeans, centers, convergence = self.__cluster_target_samples(
+            centers_init=centers, target_generator=target_generator, model=model)
+
+        # TODO: Filter the ambiguous target samples and classes
+
+        for _ in range(K):
+            # TODO: Class-aware sampling
+            # TODO: Compute loss
+            # TODO: Back-prop
+            pass
+
+    def __estimate_centers_init(self, source_generator, model, model_layer_ix=0, eps=1e-8):
+        features = []
+        labels = []
+
+        for ix in trange(len(source_generator)):
+            X, y = source_generator[ix]
+
+            model_output = model(X)[model_layer_ix].numpy()
+
+            features.append(model_output)
+            labels.append(y.argmax(axis=-1))
+
+        features = np.concatenate(features, axis=0)
+        features = features / (np.linalg.norm(features, axis=1, keepdims=True) + eps)
+
+        labels = np.concatenate(labels, axis=0)
+
+        centers = np.empty((self.config['dataset']['classes'], features.shape[1]))
+        for class_ix in range(self.config['dataset']['classes']):
+            centers[class_ix] = np.sum(features[labels == class_ix], axis=0)
+
+        return centers
+
+    def __cluster_target_samples(self, centers_init, target_generator, model, model_layer_ix=0):
+        features = []
+        y_gt = []
+
+        for ix in trange(len(target_generator)):
+            X, y = target_generator[ix]
+
+            model_output = model(X)[model_layer_ix].numpy()
+
+            features.append(model_output)
+            y_gt.append(y.argmax(axis=-1))
+
+        features = np.concatenate(features, axis=0)
+        y_gt = np.concatenate(y_gt, axis=0)
+
+        kmeans = SphericalKMeans()
+        y_kmeans, centers, convergence = kmeans.fit_predict(X=features, init=centers_init)
+
+        sys.stderr.write("KMeans Accuracy: {}, Convergence: {}\n".format(np.mean(y_kmeans == y_gt), convergence))
+
+        return y_kmeans, centers, convergence
 
     @staticmethod
     def _kernel(out_1, out_2, sigma=1.):
