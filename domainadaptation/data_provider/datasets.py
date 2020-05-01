@@ -74,29 +74,37 @@ class LabeledDataset(UnlabeledDataset):
 
         super().__init__(root, img_size, store_in_ram)
 
-        self._targets = []
+        self._targets = None
+        self.class_to_mask = None
 
         if type_label == 0:
-            self._supervised_labeling(root)
+            self.set_labels(self._get_supervised_labels(root))
         else:
             assert cluster_labels is not None
 
-            self._targets = cluster_labels
+            self.set_labels(cluster_labels)
 
-        self._targets = np.asarray(self._targets)
-        assert len(self._targets) == len(self)
+    @staticmethod
+    def _get_supervised_labels(root):
 
-        self.class_to_mask = {class_: np.asarray(self._targets == class_, dtype=np.int8)
-                              for class_ in range(self._targets.max() + 1)}
-
-    def _supervised_labeling(self, root):
-
+        targets = []
         classes = sorted(os.listdir(root))
         class_map = dict(zip(classes, range(len(classes))))
 
         for cls_ in classes:
             len_dir = len(os.listdir(os.path.join(root, cls_)))
-            self._targets.extend([class_map[cls_]] * len_dir)
+            targets.extend([class_map[cls_]] * len_dir)
+
+        return targets
+
+    def set_labels(self, labels):
+
+        assert len(self) == len(labels)
+
+        self._targets = np.asarray(labels)
+
+        self.class_to_mask = {class_: np.asarray(self._targets == class_, dtype=np.int8)
+                              for class_ in range(self._targets.max() + 1)}
 
     def __getitem__(self, idx):
 
