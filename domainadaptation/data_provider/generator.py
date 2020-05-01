@@ -2,8 +2,6 @@ import os
 
 import numpy as np
 import tensorflow as tf
-
-from PIL import Image
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 
 
@@ -25,68 +23,6 @@ class DomainGenerator:
         return self.datagen.flow_from_directory(dir, **generator_kwargs)
 
 
-class Dataset:
-
-    def __init__(self, root, img_size, store_in_ram):
-        """
-        Arguments:
-
-            :param root: (str) path to root
-            :param img_size: (int) to what size to resize the images
-            :param store_in_ram: (bool) whether to store in RAM the data
-        """
-
-        self.root = root
-        self.img_size = img_size
-        self.store_in_ram = store_in_ram
-        self.classes = sorted(os.listdir(root))
-        self.class_map = dict(zip(self.classes, range(len(self.classes))))
-
-        self._dataset = []
-        self._classes = []
-
-        for class_ in self.classes:
-            for filename in sorted(os.listdir(os.path.join(root, class_))):
-
-                path = os.path.join(self.root, class_, filename)
-
-                if self.store_in_ram:
-                    img = self._read_img(path=path, img_size=self.img_size)
-                    self._dataset.append(img)
-                else:
-                    self._dataset.append(path)
-
-                self._classes.append(self.class_map[class_])
-
-    @staticmethod
-    def _read_img(path, img_size):
-        """
-        Reads image from path, resizes to (img_size x img_size)
-        and convert to numpy array
-
-        Arguments:
-
-            :param path: (str) path to image
-            :param img_size: (int) to what size to resize the images
-        """
-
-        img = Image.open(path).resize((img_size, img_size))
-        return np.array(img)
-
-    def __len__(self):
-
-        return len(self._dataset)
-
-    def __getitem__(self, idx):
-
-        assert idx < len(self)
-
-        img = self._dataset[idx] if self.store_in_ram else \
-            self._read_img(self._dataset[idx], self.img_size)
-
-        return img, self._classes[idx]
-
-
 class MaskedDataLoader:
 
     def __init__(self, dataset, mask, batch_size, preprocess_input=lambda x: x / 255.0):
@@ -97,6 +33,7 @@ class MaskedDataLoader:
             :param mask: (array) array of bools with the same len as the dataset
             :param batch_size: (int) batch size
             :param preprocess_input: (lambda) additional function to preprocess input
+            :param TODO
         """
 
         assert len(dataset) == len(mask), 'Dataset and mask should have the same length'
@@ -106,18 +43,39 @@ class MaskedDataLoader:
         self.batch_size = batch_size
         self.preprocess_input = preprocess_input
 
-    def update_mask(self, mask):
+    def set_mask(self, mask):
 
         assert len(self.mask) == len(mask), 'Wrong length'
 
         self.mask = mask
 
-    def __iter__(self):
+    def get_batch(self, classes):
 
-        indices = np.random.permutation(len(self.dataset))
+        samples_per_batch = self.batch_size // len(classes)
+
         x_batch, y_batch = [], []
 
-        for ind in indices:
+        for i, class_ in enumerate(classes):
+            indices = self.dataset.class_to_indices[class_]
+            indices = np.random.permutation(indices)
+
+            for index in indices:
+
+                if self.mask[index]:
+                    img, target = self.dataset[index]
+                    x_batch.append(img[np.newaxis, ...])
+                    y_batch.append(target)
+
+                if len(x_batch) >= (i + 1) * samples_per_batch:
+                    break
+
+        return x_batch, y_batch
+
+    def __call__(self):
+
+        x_batch, y_batch = [], []
+
+        for ind in range(len(self.dataset)):
 
             if self.mask[ind]:
                 img, target = self.dataset[ind]
@@ -132,3 +90,5 @@ class MaskedDataLoader:
 
                 yield tf.convert_to_tensor(x_batch), tf.convert_to_tensor(y_batch)
                 x_batch, y_batch = [], []
+
+        # TODO
