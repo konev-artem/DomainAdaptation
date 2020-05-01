@@ -23,7 +23,7 @@ class DomainGenerator:
         return self.datagen.flow_from_directory(dir, **generator_kwargs)
 
 
-class MaskedDataLoader:
+class MaskedGenerator:
 
     def __init__(self, dataset, mask, batch_size, preprocess_input=lambda x: x / 255.0):
         """
@@ -33,7 +33,6 @@ class MaskedDataLoader:
             :param mask: (array) array of bools with the same len as the dataset
             :param batch_size: (int) batch size
             :param preprocess_input: (lambda) additional function to preprocess input
-            :param TODO
         """
 
         assert len(dataset) == len(mask), 'Dataset and mask should have the same length'
@@ -49,46 +48,48 @@ class MaskedDataLoader:
 
         self.mask = mask
 
+    def _transform(self, x_batch, y_batch):
+
+        x_batch, y_batch = np.concatenate(x_batch, axis=0), np.array(y_batch)
+
+        if self.preprocess_input is not None:
+            x_batch = self.preprocess_input(x_batch)
+
+        return tf.convert_to_tensor(x_batch), tf.convert_to_tensor(y_batch)
+
     def get_batch(self, classes):
+        """ Get batch of given classes according to mask """
 
         samples_per_batch = self.batch_size // len(classes)
 
         x_batch, y_batch = [], []
 
         for i, class_ in enumerate(classes):
-            indices = self.dataset.class_to_indices[class_]
-            indices = np.random.permutation(indices)
+            mask = self.dataset.class_to_mask[class_] * self.mask
+            indices = np.argwhere(mask).flatten()
+            print(indices)
+            indices = np.random.choice(indices, size=samples_per_batch, replace=False)
 
             for index in indices:
+                img, target = self.dataset[index]
+                x_batch.append(img[np.newaxis, ...])
+                y_batch.append(target)
 
-                if self.mask[index]:
-                    img, target = self.dataset[index]
-                    x_batch.append(img[np.newaxis, ...])
-                    y_batch.append(target)
-
-                if len(x_batch) >= (i + 1) * samples_per_batch:
-                    break
-
-        return x_batch, y_batch
+        return self._transform(x_batch, y_batch)
 
     def __call__(self):
+        """ Iterates through the whole dataset """
 
         x_batch, y_batch = [], []
 
         for ind in range(len(self.dataset)):
 
-            if self.mask[ind]:
-                img, target = self.dataset[ind]
-                x_batch.append(img[np.newaxis, ...])
-                y_batch.append(target)
+            img, target = self.dataset[ind]
+            x_batch.append(img[np.newaxis, ...])
+            y_batch.append(target)
 
             if len(x_batch) >= self.batch_size:
-                x_batch, y_batch = np.concatenate(x_batch, axis=0), np.array(y_batch)
-
-                if self.preprocess_input is not None:
-                    x_batch = self.preprocess_input(x_batch)
-
-                yield tf.convert_to_tensor(x_batch), tf.convert_to_tensor(y_batch)
+                yield self._transform(x_batch, y_batch)
                 x_batch, y_batch = [], []
 
-        # TODO
+        yield self._transform(x_batch, y_batch)

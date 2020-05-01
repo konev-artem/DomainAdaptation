@@ -1,5 +1,4 @@
 import os
-from collections import defaultdict
 
 import numpy as np
 from PIL import Image
@@ -69,8 +68,8 @@ class LabeledDataset(UnlabeledDataset):
             :param root: (str) path to root
             :param img_size: (int) to what size to resize the images
             :param store_in_ram: (bool) whether to store in RAM the data
-            :param type_label: (int) TODO
-            :param cluster_labels: (optional) TODO
+            :param type_label: (int) 0 if supervised labeling is performed, 1 if cluster labeling
+            :param cluster_labels: (optional) cluster labels in case of type_label == 1
         """
 
         super().__init__(root, img_size, store_in_ram)
@@ -84,11 +83,11 @@ class LabeledDataset(UnlabeledDataset):
 
             self._targets = cluster_labels
 
+        self._targets = np.asarray(self._targets)
         assert len(self._targets) == len(self)
 
-        self.class_to_indices = defaultdict(list)
-        for ind, class_ in enumerate(self._targets):
-            self.class_to_indices[class_].append(ind)
+        self.class_to_mask = {class_: np.asarray(self._targets == class_, dtype=np.int8)
+                              for class_ in range(self._targets.max() + 1)}
 
     def _supervised_labeling(self, root):
 
@@ -99,7 +98,7 @@ class LabeledDataset(UnlabeledDataset):
             len_dir = len(os.listdir(os.path.join(root, cls_)))
             self._targets.extend([class_map[cls_]] * len_dir)
 
-    def __getitem__(self, idx):  # there should be a way to pass class label
+    def __getitem__(self, idx):
 
         img = super().__getitem__(idx)
 
