@@ -187,7 +187,7 @@ def AlexNet(input_shape=(227, 227, 3), weights='imagenet', include_top=False, **
 
     model = tf.keras.Model(
         inputs=x,
-        outputs=prob if include_top else fc7
+        outputs=prob if include_top else tf.reshape(maxpool5, [-1, int(np.prod(maxpool5.get_shape()[1:]))])
     )
 
     for layer in model.layers:
