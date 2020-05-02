@@ -53,12 +53,13 @@ class CANExperiment(Experiment):
             preprocess_input=self._preprocess_input,
         )
 
-        self.__perform_can_loop(
-            source_generator=source_generator,
-            target_labeled_dataset=target_labeled_dataset,
-            target_masked_generator=target_masked_generator,
-            model=model,
-            K=10)
+        for _ in range(1):
+            self.__perform_can_loop(
+                source_generator=source_generator,
+                target_labeled_dataset=target_labeled_dataset,
+                target_masked_generator=target_masked_generator,
+                model=model,
+                K=10)
 
     def __perform_can_loop(self, source_generator,
                            target_labeled_dataset, target_masked_generator,
@@ -70,15 +71,13 @@ class CANExperiment(Experiment):
         target_masked_generator.set_mask(np.ones(len(target_labeled_dataset)))
 
         # Cluster target samples
-        target_y_kmeans, centers, convergence = self.__cluster_target_samples(
+        target_y_kmeans, centers, convergence, good_classes = self.__cluster_target_samples(
             centers_init=centers,
             target_masked_generator=target_masked_generator,
             model=model)
 
         # Update target dataset labels with labels obtained from KMeans
         target_labeled_dataset.set_labels(target_y_kmeans)
-
-        # TODO: Filter the ambiguous target samples and classes
 
         for _ in range(K):
             # TODO: Class-aware sampling
@@ -121,7 +120,38 @@ class CANExperiment(Experiment):
         kmeans = SphericalKMeans()
         y_kmeans, centers, convergence = kmeans.fit_predict(X=features, init=centers_init)
 
-        return y_kmeans, centers, convergence
+        close_to_center_mask = self.__find_samples_close_to_centers(features, y_kmeans, centers)
+        target_masked_generator.set_mask(close_to_center_mask)
+
+        good_classes = self.__find_good_classes(y_kmeans, close_to_center_mask)
+
+        return y_kmeans, centers, convergence, good_classes
+
+    def __find_samples_close_to_centers(self, features, labels, centers):
+        centers = centers / np.linalg.norm(centers, axis=1, keepdims=True)
+        centers = centers[labels]   # [N, dim]
+
+        features = features / np.linalg.norm(centers, axis=1, keepdims=True)    # [N, dim]
+
+        assert features.ndim == centers.ndim == 2 and features.shape == centers.shape
+
+        dist = 0.5 * (1 - np.sum(features * centers, axis=1))   # [N]
+        assert dist.ndim == 1 and dist.shape[0] == features.shape[0]
+
+        mask = dist < self.config['D_0']
+        sys.stderr.write("{}% samples from target are close to their centers\n".format(np.mean(mask) * 100))
+        return mask
+
+    def __find_good_classes(self, labels, mask):
+        labels = labels[mask]   # keep only labels where mask == 1
+
+        good_classes = []
+        for class_ix in range(self.config['dataset']['classes']):
+            if np.sum(labels == class_ix) > self.config['N_0']:
+                good_classes.append(class_ix)
+
+        sys.stderr.write("Found {} good classes after filtering far samples\n".format(len(good_classes)))
+        return np.asarray(good_classes, dtype=np.int32)
 
     @staticmethod
     def _kernel(out_1, out_2, sigma=1.):
