@@ -22,6 +22,12 @@ class CANExperiment(Experiment):
 
     def __init__(self, config):
         super().__init__(config)
+        
+        # Parameters for learning rate scheduling
+        self._conv_lr0 = 0.001
+        self._dense_lr0 = 0.01
+        self._a = 10
+        self._b = 0.75
 
     def __call__(self):
         backbone = self._get_new_backbone_instance()
@@ -43,7 +49,8 @@ class CANExperiment(Experiment):
             root=os.path.join(self.config["dataset"]["path"], self.config["dataset"]["source"]),
             img_size=self.config["backbone"]["img_size"][0],
             store_in_ram=True,
-            type_label=0)
+            type_label=0
+        )
 
         source_masked_generator = MaskedGenerator(
             dataset=source_labeled_dataset,
@@ -56,27 +63,30 @@ class CANExperiment(Experiment):
             root=os.path.join(self.config["dataset"]["path"], self.config["dataset"]["target"]),
             img_size=self.config["backbone"]["img_size"][0],
             store_in_ram=True,
-            type_label=0)   # 0 means to read dataset as labeled from folder, bet we ignore this labels
-                            # this is done just to have some initialization
-
+            type_label=0    # 0 means to read dataset as labeled from folder, bet we ignore this labels
+        )                   # this is done just to have some initialization
+            
         target_masked_generator = MaskedGenerator(
             dataset=target_labeled_dataset,
             mask=np.ones(len(target_labeled_dataset)),
             batch_size=self.config["batch_size"] // 2,
             preprocess_input=self._preprocess_input,
         )
+        
+        optimizer = keras.optimizers.SGD(learning_rate=self.config['learning_rate'], momentum=0.9)
+        p = 0.
 
-        for _ in range(self.config['CAN_steps']):
+        for i in range(self.config['CAN_steps']):
+            p = i / self.config['CAN_steps']
             self.__perform_can_loop(
                 source_masked_generator=source_masked_generator,
                 target_labeled_dataset=target_labeled_dataset,
                 target_masked_generator=target_masked_generator,
-                model=model,
-                K=self.config['K'])
+                model=model, K=self.config['K'], optimizer=optimizer, p=p)
 
     def __perform_can_loop(self, source_masked_generator,
                            target_labeled_dataset, target_masked_generator,
-                           model, K):
+                           model, K, optimizer, p):
         # Estimate centers using source dataset
         centers = self.__estimate_centers_init(source_masked_generator=source_masked_generator, model=model)
 
@@ -102,9 +112,17 @@ class CANExperiment(Experiment):
             X_source, y_source = source_masked_generator.get_batch(classes_to_use_in_batch)
 
             with tf.GradientTape() as tape:
-                # TODO: Compute loss
-                # TODO: Back-prop
-                pass
+                model_output_source = model(X_source)
+                model_output_target = model(X_target)
+                
+                loss = self._loss(model_output_source[0], y_source, model_output_source[-1],
+                                  model_output_target[0], y_target, beta=0.3)
+                
+            grads = tape.gradient(loss, model.trainable_variables)
+            optimizer.apply_gradients(zip(grads, model.trainable_variables))
+            
+            print('Progress: {}, loss:{}'.format(p, loss))
+            
 
     def __estimate_centers_init(self, source_masked_generator, model, model_layer_ix=0, eps=1e-8):
         features = []
@@ -233,18 +251,17 @@ class CANExperiment(Experiment):
         return CANExperiment._get_class_discrepancy(out_source, labels_source, out_target, labels_target, intra=True)\
             - CANExperiment._get_class_discrepancy(out_source, labels_source, out_target, labels_target, intra=False)
     
-    @staticmethod
-    def _crossentropy_loss(y, logits, from_logits=True):
+    def _crossentropy_loss(self, labels, logits, from_logits=True):
+        cls_num = self.config['dataset']['classes']
+        y = tf.one_hot(labels, cls_num, dtype=tf.float32)
         if from_logits:
             log_probs = tf.nn.log_softmax(logits, -1)
         else:
             log_probs = tf.math.log(logits, -1)
         return -tf.reduce_mean(tf.reduce_sum(y * log_probs, -1))
 
-    @staticmethod
-    def _loss(out_source, y_true_source, logits_source,
+    def _loss(self, out_source, labels_true_source, logits_source,
               out_target, labels_kmeans_target, beta, from_logits=True):
-        labels_true_source = tf.argmax(y_true_source, -1)
-        loss = CANExperiment._crossentropy_loss(y_true_source, logits_source, from_logits=from_logits)\
+        loss = self._crossentropy_loss(labels_true_source, logits_source, from_logits=from_logits)\
             + beta * CANExperiment._cdd_loss(out_source, labels_true_source, out_target, labels_kmeans_target)
         return loss

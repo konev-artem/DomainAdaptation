@@ -55,7 +55,7 @@ class MaskedGenerator:
         if self.preprocess_input is not None:
             x_batch = self.preprocess_input(x_batch)
 
-        return tf.convert_to_tensor(x_batch), tf.convert_to_tensor(y_batch)
+        return tf.convert_to_tensor(x_batch, dtype=tf.float32), tf.convert_to_tensor(y_batch, dtype=tf.int32)
 
     def get_batch(self, classes):
         """ Get batch of given classes according to mask """
