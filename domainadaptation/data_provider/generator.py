@@ -67,7 +67,7 @@ class MaskedGenerator:
         for i, class_ in enumerate(classes):
             mask = self.dataset.class_to_mask[class_] * self.mask
             indices = np.argwhere(mask).flatten()
-            indices = np.random.choice(indices, size=samples_per_batch, replace=False)
+            indices = np.random.choice(indices, size=min(samples_per_batch, len(indices)), replace=False)
 
             for index in indices:
                 img, target = self.dataset[index]
