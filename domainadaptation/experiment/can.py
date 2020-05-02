@@ -33,10 +33,23 @@ class CANExperiment(Experiment):
 
         model = keras.Model(inputs=backbone.inputs, outputs=backbone.outputs + [fc1, fc2, fc3, fc4, fc5])
 
-        source_generator = self.domain_generator.make_generator(
-            domain=self.config["dataset"]["source"],
+        # source_generator = self.domain_generator.make_generator(
+        #     domain=self.config["dataset"]["source"],
+        #     batch_size=self.config["batch_size"] // 2,
+        #     target_size=self.config["backbone"]["img_size"]
+        # )
+
+        source_labeled_dataset = LabeledDataset(
+            root=os.path.join(self.config["dataset"]["path"], self.config["dataset"]["source"]),
+            img_size=self.config["backbone"]["img_size"][0],
+            store_in_ram=True,
+            type_label=0)
+
+        source_masked_generator = MaskedGenerator(
+            dataset=source_labeled_dataset,
+            mask=np.ones(len(source_labeled_dataset)),
             batch_size=self.config["batch_size"] // 2,
-            target_size=self.config["backbone"]["img_size"]
+            preprocess_input=self._preprocess_input,
         )
 
         target_labeled_dataset = LabeledDataset(
@@ -55,17 +68,17 @@ class CANExperiment(Experiment):
 
         for _ in range(self.config['CAN_steps']):
             self.__perform_can_loop(
-                source_generator=source_generator,
+                source_masked_generator=source_masked_generator,
                 target_labeled_dataset=target_labeled_dataset,
                 target_masked_generator=target_masked_generator,
                 model=model,
                 K=self.config['K'])
 
-    def __perform_can_loop(self, source_generator,
+    def __perform_can_loop(self, source_masked_generator,
                            target_labeled_dataset, target_masked_generator,
                            model, K):
         # Estimate centers using source dataset
-        centers = self.__estimate_centers_init(source_generator=source_generator, model=model)
+        centers = self.__estimate_centers_init(source_masked_generator=source_masked_generator, model=model)
 
         # Reset mask to iterate the whole dataset in __cluster_target_samples
         target_masked_generator.set_mask(np.ones(len(target_labeled_dataset)))
@@ -86,23 +99,22 @@ class CANExperiment(Experiment):
                 replace=False)
 
             X_target, y_target = target_masked_generator.get_batch(classes_to_use_in_batch)
+            X_source, y_source = source_masked_generator.get_batch(classes_to_use_in_batch)
 
-            # TODO: Class-aware sampling
-            # TODO: Compute loss
-            # TODO: Back-prop
-            pass
+            with tf.GradientTape() as tape:
+                # TODO: Compute loss
+                # TODO: Back-prop
+                pass
 
-    def __estimate_centers_init(self, source_generator, model, model_layer_ix=0, eps=1e-8):
+    def __estimate_centers_init(self, source_masked_generator, model, model_layer_ix=0, eps=1e-8):
         features = []
         labels = []
 
-        for ix in trange(len(source_generator)):
-            X, y = source_generator[ix]
-
+        for X, y in tqdm.tqdm(source_masked_generator()):
             model_output = model(X)[model_layer_ix].numpy()
 
             features.append(model_output)
-            labels.append(y.argmax(axis=-1))
+            labels.append(y)
 
         features = np.concatenate(features, axis=0)
         features = features / (np.linalg.norm(features, axis=1, keepdims=True) + eps)
