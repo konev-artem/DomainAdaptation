@@ -35,7 +35,7 @@ class CANExperiment(Experiment):
 
         source_generator = self.domain_generator.make_generator(
             domain=self.config["dataset"]["source"],
-            batch_size=self.config["batch_size"],
+            batch_size=self.config["batch_size"] // 2,
             target_size=self.config["backbone"]["img_size"]
         )
 
@@ -49,17 +49,17 @@ class CANExperiment(Experiment):
         target_masked_generator = MaskedGenerator(
             dataset=target_labeled_dataset,
             mask=np.ones(len(target_labeled_dataset)),
-            batch_size=self.config["batch_size"],
+            batch_size=self.config["batch_size"] // 2,
             preprocess_input=self._preprocess_input,
         )
 
-        for _ in range(1):
+        for _ in range(self.config['CAN_steps']):
             self.__perform_can_loop(
                 source_generator=source_generator,
                 target_labeled_dataset=target_labeled_dataset,
                 target_masked_generator=target_masked_generator,
                 model=model,
-                K=10)
+                K=self.config['K'])
 
     def __perform_can_loop(self, source_generator,
                            target_labeled_dataset, target_masked_generator,
@@ -80,6 +80,13 @@ class CANExperiment(Experiment):
         target_labeled_dataset.set_labels(target_y_kmeans)
 
         for _ in range(K):
+            classes_to_use_in_batch = np.random.choice(
+                good_classes,
+                size=min(self.config['MAX_CLASSES_PER_BATCH'], len(good_classes)),
+                replace=False)
+
+            X_target, y_target = target_masked_generator.get_batch(classes_to_use_in_batch)
+
             # TODO: Class-aware sampling
             # TODO: Compute loss
             # TODO: Back-prop
