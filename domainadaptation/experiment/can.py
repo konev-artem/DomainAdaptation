@@ -131,7 +131,7 @@ class CANExperiment(Experiment):
         centers = centers / np.linalg.norm(centers, axis=1, keepdims=True)
         centers = centers[labels]   # [N, dim]
 
-        features = features / np.linalg.norm(centers, axis=1, keepdims=True)    # [N, dim]
+        features = features / np.linalg.norm(features, axis=1, keepdims=True)    # [N, dim]
 
         assert features.ndim == centers.ndim == 2 and features.shape == centers.shape
 
