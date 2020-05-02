@@ -11,9 +11,9 @@ if __name__ == '__main__':
 
     experiment = DANNExperiment(config={
         'backbone': {
-            'type': 'resnet50',
-            'num_trainable_layers': 10,
-            'img_size': (224, 224),
+            'type': 'alexnet',
+            'num_trainable_layers': 15,
+            'img_size': (227, 227),
             'weights': 'imagenet',
             'pooling': 'max'
         },
@@ -35,12 +35,12 @@ if __name__ == '__main__':
             'size': 75,
             'draw_legend': False,
             'legend_fontsize': 16,
-            'draw_ticks': True,
-            'filename': './visualization/visda/resnet50_with_domain_adaptation'
+            'draw_ticks': True,            
+            'filename': './visualization/visda/alexnet_with_domain_adaptation'
         },
         'batch_size': 16,
-        'learning_rate': 3e-4,
-        'epochs': 2,
+        'learning_rate': 3e-5,
+        'epochs': 1,
     })
 
     experiment(train_domain_head=True)

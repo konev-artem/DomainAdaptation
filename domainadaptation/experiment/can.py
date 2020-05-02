@@ -154,10 +154,15 @@ class CANExperiment(Experiment):
         return np.asarray(good_classes, dtype=np.int32)
 
     @staticmethod
-    def _kernel(out_1, out_2, sigma=1.):
-        norm = tf.reduce_sum((out_1[:, None] - out_2[None]) ** 2, -1)
-        return tf.exp(-norm / sigma)
-    
+    def _kernel(out_1, out_2, fixed_sigma=None):
+        l2_distance = tf.reduce_sum((out_1[:, None] - out_2[None]) ** 2, axis=-1)
+        if fixed_sigma:
+            bandwidth = fixed_sigma
+        else:
+            bandwidth = tf.reduce_mean(l2_distance)
+        kernel_val = tf.math.exp(-l2_distance / bandwidth)
+        return kernel_val
+
     @staticmethod
     def _get_mask(labels_1, labels_2, intra=True):
         cls_num = tf.unique(labels_1)[0].shape[0]
