@@ -23,6 +23,9 @@ class CANExperiment(Experiment):
     def __init__(self, config):
         super().__init__(config)
         
+        # Weight of CDD loss in total loss
+        self._beta = 0.3
+        
         # Parameters for learning rate scheduling
         self._conv_lr0 = 0.001
         self._dense_lr0 = 0.01
@@ -39,6 +42,9 @@ class CANExperiment(Experiment):
 
         model = keras.Model(inputs=backbone.inputs, outputs=backbone.outputs + [fc1, fc2, fc3, fc4, fc5])
 
+#         fc = keras.layers.Dense(self.config['dataset']['classes'])(backbone.outputs[0])
+#         model = keras.Model(inputs=backbone.inputs, outputs=backbone.outputs + [fc])
+        
         # source_generator = self.domain_generator.make_generator(
         #     domain=self.config["dataset"]["source"],
         #     batch_size=self.config["batch_size"] // 2,
@@ -115,13 +121,21 @@ class CANExperiment(Experiment):
                 model_output_source = model(X_source)
                 model_output_target = model(X_target)
                 
-                loss = self._loss(model_output_source[0], y_source, model_output_source[-1],
-                                  model_output_target[0], y_target, beta=0.3)
+                logits_source = model_output_source[-1]
+                crossentropy_loss = self._crossentropy_loss(y_source, logits_source, from_logits=True)
+                
+                cdd_loss = 0
+                # ...[:-1] --- do not consider logits in CDD loss
+                for out_source, out_target in zip(model_output_source[:-1], model_output_target[:-1]):
+                    cdd_loss += CANExperiment._cdd_loss(out_source, y_source, out_target, y_target)
+                
+                loss = crossentropy_loss + self._beta * cdd_loss
                 
             grads = tape.gradient(loss, model.trainable_variables)
             optimizer.apply_gradients(zip(grads, model.trainable_variables))
             
-            print('Progress: {}, loss:{}'.format(p, loss))
+            print('Progress: {}, loss:{}\ncrossentropy_loss: {}, cdd_loss: {}'\
+                  .format(p, loss, crossentropy_loss, cdd_loss))
             
 
     def __estimate_centers_init(self, source_masked_generator, model, model_layer_ix=0, eps=1e-8):
@@ -259,9 +273,3 @@ class CANExperiment(Experiment):
         else:
             log_probs = tf.math.log(logits, -1)
         return -tf.reduce_mean(tf.reduce_sum(y * log_probs, -1))
-
-    def _loss(self, out_source, labels_true_source, logits_source,
-              out_target, labels_kmeans_target, beta, from_logits=True):
-        loss = self._crossentropy_loss(labels_true_source, logits_source, from_logits=from_logits)\
-            + beta * CANExperiment._cdd_loss(out_source, labels_true_source, out_target, labels_kmeans_target)
-        return loss
