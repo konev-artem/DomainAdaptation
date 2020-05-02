@@ -38,27 +38,27 @@ class Experiment:
 
         if config["backbone"]["type"] == self.BackboneType.ALEXNET:
             self._backbone_class = AlexNet
-            preprocess_input = domainadaptation.models.alexnet.proprocess_input
+            self._preprocess_input = domainadaptation.models.alexnet.proprocess_input
         elif config["backbone"]["type"] == self.BackboneType.VGG16:
             self._backbone_class = keras.applications.vgg16.VGG16
-            preprocess_input = keras.applications.vgg16.preprocess_input
+            self._preprocess_input = keras.applications.vgg16.preprocess_input
         elif config["backbone"]["type"] == self.BackboneType.RESNET50:
             self._backbone_class = keras.applications.resnet.ResNet50
-            preprocess_input = keras.applications.resnet.preprocess_input
+            self._preprocess_input = keras.applications.resnet.preprocess_input
         elif config["backbone"]["type"] == self.BackboneType.RESNET101:
             self._backbone_class = keras.applications.resnet.ResNet101
-            preprocess_input = keras.applications.resnet.preprocess_input
+            self._preprocess_input = keras.applications.resnet.preprocess_input
         elif config["backbone"]["type"] == self.BackboneType.MOBILENET:
             self._backbone_class = keras.applications.mobilenet.MobileNet
-            preprocess_input = keras.applications.mobilenet.preprocess_input
+            self._preprocess_input = keras.applications.mobilenet.preprocess_input
         elif config["backbone"]["type"] == self.BackboneType.MOBILENETv2:
             self._backbone_class = keras.applications.mobilenet_v2.MobileNetV2
-            preprocess_input = keras.applications.mobilenet_v2.preprocess_input
+            self._preprocess_input = keras.applications.mobilenet_v2.preprocess_input
         else:
             raise ValueError("Not supported backbone type")
 
         self.domain_generator = DomainGenerator(config["dataset"]["path"],
-                                                preprocessing_function=preprocess_input,
+                                                preprocessing_function=self._preprocess_input,
                                                 **config["dataset"]["augmentations"])
 
     def _get_new_backbone_instance(self, **kwargs):
