@@ -3,14 +3,18 @@ import pandas as pd
 import tensorflow as tf
 import tensorflow.keras as keras
 import sys
+import os
 
 from domainadaptation.tester import Tester
 from domainadaptation.models import GradientReversal
 from domainadaptation.experiment import Experiment
 from domainadaptation.visualizer import Visualizer
+
 from domainadaptation.utils import SphericalKMeans
+from domainadaptation.data_provider import LabeledDataset, MaskedGenerator
 
 from tqdm import trange
+import tqdm
 
 
 class CANExperiment(Experiment):
@@ -35,23 +39,44 @@ class CANExperiment(Experiment):
             target_size=self.config["backbone"]["img_size"]
         )
 
-        target_generator = self.domain_generator.make_generator(
-            domain=self.config["dataset"]["target"],
+        target_labeled_dataset = LabeledDataset(
+            root=os.path.join(self.config["dataset"]["path"], self.config["dataset"]["target"]),
+            img_size=self.config["backbone"]["img_size"][0],
+            store_in_ram=True,
+            type_label=0)   # 0 means to read dataset as labeled from folder, bet we ignore this labels
+                            # this is done just to have some initialization
+
+        target_masked_generator = MaskedGenerator(
+            dataset=target_labeled_dataset,
+            mask=np.ones(len(target_labeled_dataset)),
             batch_size=self.config["batch_size"],
-            target_size=self.config["backbone"]["img_size"]
+            preprocess_input=self._preprocess_input,
         )
 
         self.__perform_can_loop(
             source_generator=source_generator,
-            target_generator=target_generator,
+            target_labeled_dataset=target_labeled_dataset,
+            target_masked_generator=target_masked_generator,
             model=model,
             K=10)
 
-    def __perform_can_loop(self, source_generator, target_generator, model, K):
+    def __perform_can_loop(self, source_generator,
+                           target_labeled_dataset, target_masked_generator,
+                           model, K):
+        # Estimate centers using source dataset
         centers = self.__estimate_centers_init(source_generator=source_generator, model=model)
 
+        # Reset mask to iterate the whole dataset in __cluster_target_samples
+        target_masked_generator.set_mask(np.ones(len(target_labeled_dataset)))
+
+        # Cluster target samples
         target_y_kmeans, centers, convergence = self.__cluster_target_samples(
-            centers_init=centers, target_generator=target_generator, model=model)
+            centers_init=centers,
+            target_masked_generator=target_masked_generator,
+            model=model)
+
+        # Update target dataset labels with labels obtained from KMeans
+        target_labeled_dataset.set_labels(target_y_kmeans)
 
         # TODO: Filter the ambiguous target samples and classes
 
@@ -84,25 +109,17 @@ class CANExperiment(Experiment):
 
         return centers
 
-    def __cluster_target_samples(self, centers_init, target_generator, model, model_layer_ix=0):
+    def __cluster_target_samples(self, centers_init, target_masked_generator, model, model_layer_ix=0):
         features = []
-        y_gt = []
 
-        for ix in trange(len(target_generator)):
-            X, y = target_generator[ix]
-
+        for X, _ in tqdm.tqdm(target_masked_generator()):
             model_output = model(X)[model_layer_ix].numpy()
-
             features.append(model_output)
-            y_gt.append(y.argmax(axis=-1))
 
         features = np.concatenate(features, axis=0)
-        y_gt = np.concatenate(y_gt, axis=0)
 
         kmeans = SphericalKMeans()
         y_kmeans, centers, convergence = kmeans.fit_predict(X=features, init=centers_init)
-
-        sys.stderr.write("KMeans Accuracy: {}, Convergence: {}\n".format(np.mean(y_kmeans == y_gt), convergence))
 
         return y_kmeans, centers, convergence
 
