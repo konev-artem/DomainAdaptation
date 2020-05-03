@@ -44,6 +44,7 @@ class CANExperiment(Experiment):
 
 #         fc = keras.layers.Dense(self.config['dataset']['classes'])(backbone.outputs[0])
 #         model = keras.Model(inputs=backbone.inputs, outputs=backbone.outputs + [fc])
+        test_model = keras.Model(inputs=model.inputs, outputs=model.outputs[-1])
         
         # source_generator = self.domain_generator.make_generator(
         #     domain=self.config["dataset"]["source"],
@@ -79,6 +80,20 @@ class CANExperiment(Experiment):
             preprocess_input=self._preprocess_input,
         )
         
+        source_test_generator = self.domain_generator.make_generator(
+            domain=self.config["dataset"]["source"],
+            batch_size=self.config["batch_size"],
+            target_size=self.config["backbone"]["img_size"]
+        )
+        
+        target_test_generator = self.domain_generator.make_generator(
+            domain=self.config["dataset"]["target"],
+            batch_size=self.config["batch_size"],
+            target_size=self.config["backbone"]["img_size"]
+        )
+        
+        tester = Tester()
+        
         optimizer = keras.optimizers.SGD(learning_rate=self.config['learning_rate'], momentum=0.9)
         p = 0.
 
@@ -89,6 +104,9 @@ class CANExperiment(Experiment):
                 target_labeled_dataset=target_labeled_dataset,
                 target_masked_generator=target_masked_generator,
                 model=model, K=self.config['K'], optimizer=optimizer, p=p)
+            
+            tester.test(test_model, source_test_generator)
+            tester.test(test_model, target_test_generator)
 
     def __perform_can_loop(self, source_masked_generator,
                            target_labeled_dataset, target_masked_generator,
