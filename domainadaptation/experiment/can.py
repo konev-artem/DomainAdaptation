@@ -105,8 +105,9 @@ class CANExperiment(Experiment):
                 target_masked_generator=target_masked_generator,
                 model=model, K=self.config['K'], optimizer=optimizer, p=p)
             
-            tester.test(test_model, source_test_generator)
-            tester.test(test_model, target_test_generator)
+            if i % self.config['validation_frequency'] == 0:
+                tester.test(test_model, source_test_generator)
+                tester.test(test_model, target_test_generator)
 
     def __perform_can_loop(self, source_masked_generator,
                            target_labeled_dataset, target_masked_generator,
