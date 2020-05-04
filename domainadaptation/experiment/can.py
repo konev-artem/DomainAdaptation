@@ -10,7 +10,7 @@ from domainadaptation.models import GradientReversal
 from domainadaptation.experiment import Experiment
 from domainadaptation.visualizer import Visualizer
 
-from domainadaptation.utils import SphericalKMeans
+from domainadaptation.utils import SphericalKMeans, make_batch_normalization_layers_domain_specific
 from domainadaptation.data_provider import LabeledDataset, MaskedGenerator
 
 from tqdm import trange
@@ -32,8 +32,17 @@ class CANExperiment(Experiment):
         self._a = 10
         self._b = 0.75
 
+    def __switch_batchnorm_mode(self, mode):
+        assert mode in ['source', 'target']
+        self.domain_variable.assign(mode == 'source')
+
     def __call__(self):
         backbone = self._get_new_backbone_instance()
+
+        self.domain_variable = tf.Variable(False, dtype=tf.bool, trainable=False)
+        if self.config['use_domain_specific_batchnormalization'] is True:
+            backbone = make_batch_normalization_layers_domain_specific(backbone, self.domain_variable)
+
         fc1 = keras.layers.Dense(1024, activation='relu')(backbone.outputs[0])
         fc2 = keras.layers.Dense(512, activation='relu')(fc1)
         fc3 = keras.layers.Dense(256, activation='relu')(fc2)
@@ -104,8 +113,10 @@ class CANExperiment(Experiment):
                 target_labeled_dataset=target_labeled_dataset,
                 target_masked_generator=target_masked_generator,
                 model=model, K=self.config['K'], optimizer=optimizer, p=p)
-            
+
+            self.__switch_batchnorm_mode('source')
             tester.test(test_model, source_test_generator)
+            self.__switch_batchnorm_mode('target')
             tester.test(test_model, target_test_generator)
 
     def __perform_can_loop(self, source_masked_generator,
@@ -136,7 +147,10 @@ class CANExperiment(Experiment):
             X_source, y_source = source_masked_generator.get_batch(classes_to_use_in_batch)
 
             with tf.GradientTape() as tape:
+                self.__switch_batchnorm_mode('source')
                 model_output_source = model(X_source)
+
+                self.__switch_batchnorm_mode('target')
                 model_output_target = model(X_target)
                 
                 logits_source = model_output_source[-1]
@@ -154,12 +168,12 @@ class CANExperiment(Experiment):
             
             print('Progress: {}, loss:{}\ncrossentropy_loss: {}, cdd_loss: {}'\
                   .format(p, loss, crossentropy_loss, cdd_loss))
-            
 
     def __estimate_centers_init(self, source_masked_generator, model, model_layer_ix=0, eps=1e-8):
         features = []
         labels = []
 
+        self.__switch_batchnorm_mode('source')
         for X, y in tqdm.tqdm(source_masked_generator()):
             model_output = model(X)[model_layer_ix].numpy()
 
@@ -180,6 +194,7 @@ class CANExperiment(Experiment):
     def __cluster_target_samples(self, centers_init, target_masked_generator, model, model_layer_ix=0):
         features = []
 
+        self.__switch_batchnorm_mode('target')
         for X, _ in tqdm.tqdm(target_masked_generator()):
             model_output = model(X)[model_layer_ix].numpy()
             features.append(model_output)
