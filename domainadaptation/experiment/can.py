@@ -42,6 +42,17 @@ class CANExperiment(Experiment):
 
         model = keras.Model(inputs=backbone.inputs, outputs=backbone.outputs + [fc1, fc2, fc3, fc4, fc5])
 
+        # save backbone and head variables
+        backbone_names = [var.name for var in backbone.trainable_variables]
+
+        self.backbone_variables, self.head_variables = [], []
+
+        for var in model.trainable_variables:
+            if var.name in backbone_names:
+                self.backbone_variables.append(var)
+            else:
+                self.head_variables.append(var)
+
         #         fc = keras.layers.Dense(self.config['dataset']['classes'])(backbone.outputs[0])
         #         model = keras.Model(inputs=backbone.inputs, outputs=backbone.outputs + [fc])
         test_model = keras.Model(inputs=model.inputs, outputs=model.outputs[-1])
@@ -98,8 +109,8 @@ class CANExperiment(Experiment):
         p = 0.
 
         optimizers = {
-            'dense': keras.optimizers.SGD(learning_rate=self._dense_lr0, momentum=0.9),
-            'conv': keras.optimizers.SGD(learning_rate=self._conv_lr0, momentum=0.9)
+            'head': keras.optimizers.SGD(learning_rate=self._dense_lr0, momentum=0.9),
+            'backbone': keras.optimizers.SGD(learning_rate=self._conv_lr0, momentum=0.9)
         }
 
         for i in range(self.config['CAN_steps']):
@@ -155,15 +166,12 @@ class CANExperiment(Experiment):
 
                 loss = crossentropy_loss + self._beta * cdd_loss
 
-            conv_variables = [var for var in model.trainable_variables if 'conv' in var.name]
-            dense_variables = [var for var in model.trainable_variables if 'dense' in var.name]
-
             grads = tape.gradient(loss, model.trainable_variables)
-            grad_convs = grads[:len(conv_variables)]
-            grad_denses = grads[len(conv_variables):]
+            grad_convs = grads[:len(self.backbone_variables)]
+            grad_denses = grads[len(self.backbone_variables):]
 
-            optimizer['conv'].apply_gradients(zip(grad_convs, conv_variables))
-            optimizer['dense'].apply_gradients(zip(grad_denses, dense_variables))
+            optimizer['backbone'].apply_gradients(zip(grad_convs, self.backbone_variables))
+            optimizer['head'].apply_gradients(zip(grad_denses, self.head_variables))
             # optimizer.apply_gradients(zip(grads, model.trainable_variables))
 
             print('Progress: {}, loss:{}\ncrossentropy_loss: {}, cdd_loss: {}' \
