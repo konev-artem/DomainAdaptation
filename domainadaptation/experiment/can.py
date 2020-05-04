@@ -32,9 +32,15 @@ class CANExperiment(Experiment):
         self._a = 10
         self._b = 0.75
 
+        self._backbone_lr_multiplier = 0.1
+
     def __switch_batchnorm_mode(self, mode):
         assert mode in ['source', 'target']
         self.domain_variable.assign(mode == 'source')
+
+    def __update_learning_rate(self, p):
+        new_lr = self.config['learning_rate'] / ((1 + self._a * p) ** self._b)
+        self.learning_rate.assign(new_lr)
 
     def __call__(self):
         backbone = self._get_new_backbone_instance()
@@ -109,13 +115,17 @@ class CANExperiment(Experiment):
         optimizer = keras.optimizers.SGD(learning_rate=self.config['learning_rate'], momentum=0.9)
         p = 0.
 
+        self.learning_rate = tf.Variable(self.config['learning_rate'], dtype=tf.float32, trainable=False)
         optimizers = {
-            'head': keras.optimizers.SGD(learning_rate=self._dense_lr0, momentum=0.9),
-            'backbone': keras.optimizers.SGD(learning_rate=self._conv_lr0, momentum=0.9)
+            'head': keras.optimizers.SGD(learning_rate=self.learning_rate, momentum=0.9),
+            'backbone': keras.optimizers.SGD(learning_rate=self._backbone_lr_multiplier * self.learning_rate, momentum=0.9)
         }
 
         for i in range(self.config['CAN_steps']):
             p = i / self.config['CAN_steps']
+            self.__update_learning_rate(p)
+            sys.stderr.write("Learning rate: {}\n".format(self.learning_rate.numpy()))
+
             self.__perform_can_loop(
                 source_masked_generator=source_masked_generator,
                 target_labeled_dataset=target_labeled_dataset,
