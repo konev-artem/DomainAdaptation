@@ -50,17 +50,8 @@ class CANExperiment(Experiment):
         fc5 = keras.layers.Dense(self.config['dataset']['classes'])(fc4)
 
         model = keras.Model(inputs=backbone.inputs, outputs=backbone.outputs + [fc1, fc2, fc3, fc4, fc5])
-
-#         fc = keras.layers.Dense(self.config['dataset']['classes'])(backbone.outputs[0])
-#         model = keras.Model(inputs=backbone.inputs, outputs=backbone.outputs + [fc])
         test_model = keras.Model(inputs=model.inputs, outputs=model.outputs[-1])
         
-        # source_generator = self.domain_generator.make_generator(
-        #     domain=self.config["dataset"]["source"],
-        #     batch_size=self.config["batch_size"] // 2,
-        #     target_size=self.config["backbone"]["img_size"]
-        # )
-
         source_labeled_dataset = LabeledDataset(
             root=os.path.join(self.config["dataset"]["path"], self.config["dataset"]["source"]),
             img_size=self.config["backbone"]["img_size"][0],
