@@ -22,10 +22,10 @@ class CANExperiment(Experiment):
 
     def __init__(self, config):
         super().__init__(config)
-        
+
         # Weight of CDD loss in total loss
         self._beta = 0.3
-        
+
         # Parameters for learning rate scheduling
         self._conv_lr0 = 0.001
         self._dense_lr0 = 0.01
@@ -42,10 +42,10 @@ class CANExperiment(Experiment):
 
         model = keras.Model(inputs=backbone.inputs, outputs=backbone.outputs + [fc1, fc2, fc3, fc4, fc5])
 
-#         fc = keras.layers.Dense(self.config['dataset']['classes'])(backbone.outputs[0])
-#         model = keras.Model(inputs=backbone.inputs, outputs=backbone.outputs + [fc])
+        #         fc = keras.layers.Dense(self.config['dataset']['classes'])(backbone.outputs[0])
+        #         model = keras.Model(inputs=backbone.inputs, outputs=backbone.outputs + [fc])
         test_model = keras.Model(inputs=model.inputs, outputs=model.outputs[-1])
-        
+
         # source_generator = self.domain_generator.make_generator(
         #     domain=self.config["dataset"]["source"],
         #     batch_size=self.config["batch_size"] // 2,
@@ -70,32 +70,37 @@ class CANExperiment(Experiment):
             root=os.path.join(self.config["dataset"]["path"], self.config["dataset"]["target"]),
             img_size=self.config["backbone"]["img_size"][0],
             store_in_ram=True,
-            type_label=0    # 0 means to read dataset as labeled from folder, bet we ignore this labels
-        )                   # this is done just to have some initialization
-            
+            type_label=0  # 0 means to read dataset as labeled from folder, bet we ignore this labels
+        )  # this is done just to have some initialization
+
         target_masked_generator = MaskedGenerator(
             dataset=target_labeled_dataset,
             mask=np.ones(len(target_labeled_dataset)),
             batch_size=self.config["batch_size"] // 2,
             preprocess_input=self._preprocess_input,
         )
-        
+
         source_test_generator = self.domain_generator.make_generator(
             domain=self.config["dataset"]["source"],
             batch_size=self.config["batch_size"],
             target_size=self.config["backbone"]["img_size"]
         )
-        
+
         target_test_generator = self.domain_generator.make_generator(
             domain=self.config["dataset"]["target"],
             batch_size=self.config["batch_size"],
             target_size=self.config["backbone"]["img_size"]
         )
-        
+
         tester = Tester()
-        
+
         optimizer = keras.optimizers.SGD(learning_rate=self.config['learning_rate'], momentum=0.9)
         p = 0.
+
+        optimizers = {
+            'dense': keras.optimizers.SGD(learning_rate=self._dense_lr0, momentum=0.9),
+            'conv': keras.optimizers.SGD(learning_rate=self._conv_lr0, momentum=0.9)
+        }
 
         for i in range(self.config['CAN_steps']):
             p = i / self.config['CAN_steps']
@@ -103,14 +108,15 @@ class CANExperiment(Experiment):
                 source_masked_generator=source_masked_generator,
                 target_labeled_dataset=target_labeled_dataset,
                 target_masked_generator=target_masked_generator,
-                model=model, K=self.config['K'], optimizer=optimizer, p=p)
-            
+                model=model, K=self.config['K'], optimizer=optimizers, p=p)
+
             tester.test(test_model, source_test_generator)
             tester.test(test_model, target_test_generator)
 
     def __perform_can_loop(self, source_masked_generator,
                            target_labeled_dataset, target_masked_generator,
                            model, K, optimizer, p):
+
         # Estimate centers using source dataset
         centers = self.__estimate_centers_init(source_masked_generator=source_masked_generator, model=model)
 
@@ -138,23 +144,30 @@ class CANExperiment(Experiment):
             with tf.GradientTape() as tape:
                 model_output_source = model(X_source)
                 model_output_target = model(X_target)
-                
+
                 logits_source = model_output_source[-1]
                 crossentropy_loss = self._crossentropy_loss(y_source, logits_source, from_logits=True)
-                
+
                 cdd_loss = 0
                 # ...[:-1] --- do not consider logits in CDD loss
                 for out_source, out_target in zip(model_output_source[:-1], model_output_target[:-1]):
                     cdd_loss += CANExperiment._cdd_loss(out_source, y_source, out_target, y_target)
-                
+
                 loss = crossentropy_loss + self._beta * cdd_loss
-                
+
+            conv_variables = [var for var in model.trainable_variables if 'conv' in var.name]
+            dense_variables = [var for var in model.trainable_variables if 'dense' in var.name]
+
             grads = tape.gradient(loss, model.trainable_variables)
-            optimizer.apply_gradients(zip(grads, model.trainable_variables))
-            
-            print('Progress: {}, loss:{}\ncrossentropy_loss: {}, cdd_loss: {}'\
+            grad_convs = grads[:len(conv_variables)]
+            grad_denses = grads[len(conv_variables):]
+
+            optimizer['conv'].apply_gradients(zip(grad_convs, conv_variables))
+            optimizer['dense'].apply_gradients(zip(grad_denses, dense_variables))
+            # optimizer.apply_gradients(zip(grads, model.trainable_variables))
+
+            print('Progress: {}, loss:{}\ncrossentropy_loss: {}, cdd_loss: {}' \
                   .format(p, loss, crossentropy_loss, cdd_loss))
-            
 
     def __estimate_centers_init(self, source_masked_generator, model, model_layer_ix=0, eps=1e-8):
         features = []
@@ -198,13 +211,13 @@ class CANExperiment(Experiment):
 
     def __find_samples_close_to_centers(self, features, labels, centers):
         centers = centers / np.linalg.norm(centers, axis=1, keepdims=True)
-        centers = centers[labels]   # [N, dim]
+        centers = centers[labels]  # [N, dim]
 
-        features = features / np.linalg.norm(features, axis=1, keepdims=True)    # [N, dim]
+        features = features / np.linalg.norm(features, axis=1, keepdims=True)  # [N, dim]
 
         assert features.ndim == centers.ndim == 2 and features.shape == centers.shape
 
-        dist = 0.5 * (1 - np.sum(features * centers, axis=1))   # [N]
+        dist = 0.5 * (1 - np.sum(features * centers, axis=1))  # [N]
         assert dist.ndim == 1 and dist.shape[0] == features.shape[0]
 
         mask = dist < self.config['D_0']
@@ -212,7 +225,7 @@ class CANExperiment(Experiment):
         return mask
 
     def __find_good_classes(self, labels, mask):
-        labels = labels[mask]   # keep only labels where mask == 1
+        labels = labels[mask]  # keep only labels where mask == 1
 
         good_classes = []
         for class_ix in range(self.config['dataset']['classes']):
@@ -236,53 +249,53 @@ class CANExperiment(Experiment):
     def _get_mask(labels_1, labels_2, intra=True):
         cls_num = tf.unique(labels_1)[0].shape[0]
         assert cls_num == tf.unique(labels_2)[0].shape[0], "Different number of classes in source and target domains"
-        
+
         n = labels_1.shape[0]
         m = labels_2.shape[0]
-        
+
         cls_mask = tf.tile(tf.unique(labels_1)[0][:, None, None], [1, n, m])
         a = tf.cast(cls_mask == tf.tile(tf.tile(labels_1[:, None], [1, m])[None], [cls_num, 1, 1]), tf.float32)
         b = tf.cast(cls_mask == tf.tile(tf.tile(labels_2[None], [n, 1])[None], [cls_num, 1, 1]), tf.float32)
-        
+
         if intra:
             return a * b
         else:
             return a[:, None] * b[None]
-    
+
     @staticmethod
     def _get_class_discrepancy(out_source, labels_source, out_target, labels_target, intra=True):
         cls_num = len(tf.unique(labels_source)[0])
-        
+
         mask_ss = CANExperiment._get_mask(labels_source, labels_source, intra=True)
         mask_tt = CANExperiment._get_mask(labels_target, labels_target, intra=True)
         mask_st = CANExperiment._get_mask(labels_source, labels_target, intra=intra)
-        
+
         axs = None
         dim_coefs = [cls_num, 1, 1]
-        
+
         kernel_ss = tf.tile(CANExperiment._kernel(out_source, out_source)[axs], dim_coefs)
         kernel_tt = tf.tile(CANExperiment._kernel(out_target, out_target)[axs], dim_coefs)
-        
+
         if not intra:
             axs = (None, None)
             dim_coefs = [cls_num, cls_num, 1, 1]
         kernel_st = tf.tile(CANExperiment._kernel(out_source, out_target)[axs], dim_coefs)
-        
+
         e1s = tf.reduce_sum(mask_ss * kernel_ss, (-2, -1)) / tf.reduce_sum(mask_ss, (-2, -1))
         e2s = tf.reduce_sum(mask_tt * kernel_tt, (-2, -1)) / tf.reduce_sum(mask_tt, (-2, -1))
         e3s = tf.reduce_sum(mask_st * kernel_st, (-2, -1)) / tf.reduce_sum(mask_st, (-2, -1))
-        
+
         if intra:
             return tf.reduce_mean(e1s + e2s - 2 * e3s)
         else:
-            return (tf.reduce_sum((cls_num - 1) * (e1s + e2s))\
+            return (tf.reduce_sum((cls_num - 1) * (e1s + e2s)) \
                     - 2 * tf.reduce_sum(e3s - tf.eye(cls_num) * e3s)) / (cls_num * (cls_num - 1))
-        
+
     @staticmethod
     def _cdd_loss(out_source, labels_source, out_target, labels_target):
-        return CANExperiment._get_class_discrepancy(out_source, labels_source, out_target, labels_target, intra=True)\
-            - CANExperiment._get_class_discrepancy(out_source, labels_source, out_target, labels_target, intra=False)
-    
+        return CANExperiment._get_class_discrepancy(out_source, labels_source, out_target, labels_target, intra=True) \
+               - CANExperiment._get_class_discrepancy(out_source, labels_source, out_target, labels_target, intra=False)
+
     def _crossentropy_loss(self, labels, logits, from_logits=True):
         cls_num = self.config['dataset']['classes']
         y = tf.one_hot(labels, cls_num, dtype=tf.float32)
