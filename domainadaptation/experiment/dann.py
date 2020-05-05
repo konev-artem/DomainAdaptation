@@ -109,7 +109,7 @@ class DANNExperiment(Experiment):
             accuracies = tester.test(classification_model, self.domain_generator.make_generator(
                 domain=self.config["dataset"]["target"],
                 batch_size=self.config["batch_size"],
-                target_size=self.config["backbone"]["img-size"]))
+                target_size=self.config["backbone"]["img_size"]))
 
             target_epoch_accuracy.append(np.mean(accuracies) * 100)
 
