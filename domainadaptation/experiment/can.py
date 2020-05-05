@@ -50,8 +50,9 @@ class CANExperiment(Experiment):
             backbone = make_batch_normalization_layers_domain_specific(backbone, self.domain_variable)
 
         fc = keras.layers.Dense(self.config['dataset']['classes'])(backbone.outputs[0])
+        probs = keras.layers.Softmax(axis=-1)(fc)
 
-        model = keras.Model(inputs=backbone.inputs, outputs=backbone.outputs + [fc])
+        model = keras.Model(inputs=backbone.inputs, outputs=backbone.outputs + [probs])
 
         # save backbone and head variables
         backbone_names = [var.name for var in backbone.trainable_variables]
@@ -169,12 +170,11 @@ class CANExperiment(Experiment):
                 self.__switch_batchnorm_mode('target')
                 model_output_target = model(X_target)
 
-                logits_source = model_output_source[-1]
-                crossentropy_loss = self._crossentropy_loss(y_source, logits_source, from_logits=True)
+                probs_source = model_output_source[-1]
+                crossentropy_loss = self._crossentropy_loss(y_source, probs_source, from_logits=False)
 
                 cdd_loss = 0
-                # ...[1:] --- do not consider outputs of pooling layer
-                for out_source, out_target in zip(model_output_source[1:], model_output_target[1:]):
+                for out_source, out_target in zip(model_output_source, model_output_target):
                     cdd_loss += CANExperiment._cdd_loss(out_source, y_source, out_target, y_target)
 
                 loss = crossentropy_loss + self._beta * cdd_loss
@@ -185,7 +185,6 @@ class CANExperiment(Experiment):
 
             optimizer['backbone'].apply_gradients(zip(grad_convs, self.backbone_variables))
             optimizer['head'].apply_gradients(zip(grad_denses, self.head_variables))
-            # optimizer.apply_gradients(zip(grads, model.trainable_variables))
 
             print('Progress: {}, loss:{}\ncrossentropy_loss: {}, cdd_loss: {}' \
                   .format(p, loss, crossentropy_loss, cdd_loss))
@@ -323,10 +322,4 @@ class CANExperiment(Experiment):
                - CANExperiment._get_class_discrepancy(out_source, labels_source, out_target, labels_target, intra=False)
 
     def _crossentropy_loss(self, labels, logits, from_logits=True):
-        cls_num = self.config['dataset']['classes']
-        y = tf.one_hot(labels, cls_num, dtype=tf.float32)
-        if from_logits:
-            log_probs = tf.nn.log_softmax(logits, -1)
-        else:
-            log_probs = tf.math.log(logits, -1)
-        return -tf.reduce_mean(tf.reduce_sum(y * log_probs, -1))
+        return tf.reduce_mean(keras.losses.sparse_categorical_crossentropy(labels, logits, from_logits=from_logits))
