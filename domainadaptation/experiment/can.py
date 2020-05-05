@@ -49,13 +49,9 @@ class CANExperiment(Experiment):
         if self.config['use_domain_specific_batchnormalization'] is True:
             backbone = make_batch_normalization_layers_domain_specific(backbone, self.domain_variable)
 
-        fc1 = keras.layers.Dense(1024, activation='relu')(backbone.outputs[0])
-        fc2 = keras.layers.Dense(512, activation='relu')(fc1)
-        fc3 = keras.layers.Dense(256, activation='relu')(fc2)
-        fc4 = keras.layers.Dense(128, activation='relu')(fc3)
-        fc5 = keras.layers.Dense(self.config['dataset']['classes'])(fc4)
+        fc = keras.layers.Dense(self.config['dataset']['classes'])(backbone.outputs[0])
 
-        model = keras.Model(inputs=backbone.inputs, outputs=backbone.outputs + [fc1, fc2, fc3, fc4, fc5])
+        model = keras.Model(inputs=backbone.inputs, outputs=backbone.outputs + [fc])
 
         # save backbone and head variables
         backbone_names = [var.name for var in backbone.trainable_variables]
