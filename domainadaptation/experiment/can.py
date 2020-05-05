@@ -263,7 +263,7 @@ class CANExperiment(Experiment):
         return np.asarray(good_classes, dtype=np.int32)
 
     @staticmethod
-    def _kernel(out_1, out_2, kernel_mul=2.0, kernel_num=5, fixed_sigma=None, eps=1e-5):
+    def _kernel(out_1, out_2, kernel_mul=2.0, kernel_num=5, fixed_sigma=None):
         l2_distance = tf.reduce_sum((out_1[:, None] - out_2[None]) ** 2, axis=-1)
         if fixed_sigma:
             bandwidth = fixed_sigma
@@ -272,8 +272,6 @@ class CANExperiment(Experiment):
             
         bandwidth /= kernel_mul ** (kernel_num // 2)
         bandwidth_list = bandwidth * (kernel_mul ** tf.range(0, kernel_num, dtype=tf.float32))
-        mask = tf.cast(bandwidth_list < eps, tf.float32)
-        bandwidth_list = (1. - mask) * bandwidth_list + eps * mask
         kernel_val = tf.reduce_mean(tf.math.exp(-l2_distance[..., None] / bandwidth_list), -1)
         return kernel_val
 
