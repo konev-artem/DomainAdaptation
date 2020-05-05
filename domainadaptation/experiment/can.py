@@ -131,11 +131,12 @@ class CANExperiment(Experiment):
                 target_labeled_dataset=target_labeled_dataset,
                 target_masked_generator=target_masked_generator,
                 model=model, K=self.config['K'], optimizer=optimizers, p=p)
-
-            self.__switch_batchnorm_mode('source')
-            tester.test(test_model, source_test_generator)
-            self.__switch_batchnorm_mode('target')
-            tester.test(test_model, target_test_generator)
+            
+            if i % self.config['validation_frequency'] == 0:
+                self.__switch_batchnorm_mode('source')
+                tester.test(test_model, source_test_generator)
+                self.__switch_batchnorm_mode('target')
+                tester.test(test_model, target_test_generator)
 
     def __perform_can_loop(self, source_masked_generator,
                            target_labeled_dataset, target_masked_generator,
@@ -262,13 +263,16 @@ class CANExperiment(Experiment):
         return np.asarray(good_classes, dtype=np.int32)
 
     @staticmethod
-    def _kernel(out_1, out_2, fixed_sigma=None):
+    def _kernel(out_1, out_2, kernel_mul=2.0, kernel_num=5, fixed_sigma=None):
         l2_distance = tf.reduce_sum((out_1[:, None] - out_2[None]) ** 2, axis=-1)
         if fixed_sigma:
             bandwidth = fixed_sigma
         else:
             bandwidth = tf.reduce_mean(l2_distance)
-        kernel_val = tf.math.exp(-l2_distance / bandwidth)
+            
+        bandwidth /= kernel_mul ** (kernel_num // 2)
+        bandwidth_list = bandwidth * (kernel_mul ** tf.range(0, kernel_num, dtype=tf.float32))
+        kernel_val = tf.reduce_mean(tf.math.exp(-l2_distance[..., None] / bandwidth_list), -1)
         return kernel_val
 
     @staticmethod
