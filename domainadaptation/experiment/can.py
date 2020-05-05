@@ -173,8 +173,8 @@ class CANExperiment(Experiment):
                 crossentropy_loss = self._crossentropy_loss(y_source, logits_source, from_logits=True)
 
                 cdd_loss = 0
-                # ...[:-1] --- do not consider logits in CDD loss
-                for out_source, out_target in zip(model_output_source[:-1], model_output_target[:-1]):
+                # ...[1:] --- do not consider outputs of pooling layer
+                for out_source, out_target in zip(model_output_source[1:], model_output_target[1:]):
                     cdd_loss += CANExperiment._cdd_loss(out_source, y_source, out_target, y_target)
 
                 loss = crossentropy_loss + self._beta * cdd_loss
