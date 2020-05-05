@@ -236,11 +236,11 @@ class CANExperiment(Experiment):
 
         return y_kmeans, centers, convergence, good_classes
 
-    def __find_samples_close_to_centers(self, features, labels, centers):
-        centers = centers / np.linalg.norm(centers, axis=1, keepdims=True)
+    def __find_samples_close_to_centers(self, features, labels, centers, eps=1e-8):
+        centers = centers / (np.linalg.norm(centers, axis=1, keepdims=True) + eps)
         centers = centers[labels]  # [N, dim]
 
-        features = features / np.linalg.norm(features, axis=1, keepdims=True)  # [N, dim]
+        features = features / (np.linalg.norm(features, axis=1, keepdims=True) + eps)  # [N, dim]
 
         assert features.ndim == centers.ndim == 2 and features.shape == centers.shape
 
