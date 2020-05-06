@@ -10,7 +10,7 @@ from domainadaptation.models import GradientReversal
 from domainadaptation.experiment import Experiment
 from domainadaptation.visualizer import Visualizer
 
-from domainadaptation.utils import SphericalKMeans, make_batch_normalization_layers_domain_specific
+from domainadaptation.utils import SphericalKMeans, make_batch_normalization_layers_domain_specific_and_set_regularization
 from domainadaptation.data_provider import LabeledDataset, MaskedGenerator
 
 from tqdm import trange
@@ -47,7 +47,11 @@ class CANExperiment(Experiment):
 
         self.domain_variable = tf.Variable(False, dtype=tf.bool, trainable=False)
         if self.config['use_domain_specific_batchnormalization'] is True:
-            backbone = make_batch_normalization_layers_domain_specific(backbone, self.domain_variable)
+            backbone = make_batch_normalization_layers_domain_specific_and_set_regularization(
+                backbone,
+                self.domain_variable,
+                kernel_regularizer=self.config.get("kernel_regularizer", None),
+                bias_regularizer=self.config.get("bias_regularizer", None))
 
         fc = keras.layers.Dense(self.config['dataset']['classes'])(backbone.outputs[0])
         probs = keras.layers.Softmax(axis=-1)(fc)
@@ -171,6 +175,8 @@ class CANExperiment(Experiment):
                 self.__switch_batchnorm_mode('target')
                 model_output_target = model(X_target)
 
+                regularization_loss = tf.math.add_n(model.losses)
+
                 probs_source = model_output_source[-1]
                 crossentropy_loss = self._crossentropy_loss(y_source, probs_source, from_logits=False)
 
@@ -178,7 +184,7 @@ class CANExperiment(Experiment):
                 for out_source, out_target in zip(model_output_source, model_output_target):
                     cdd_loss += CANExperiment._cdd_loss(out_source, y_source, out_target, y_target)
 
-                loss = crossentropy_loss + self._beta * cdd_loss
+                loss = crossentropy_loss + self._beta * cdd_loss + regularization_loss
 
             grads = tape.gradient(loss, model.trainable_variables)
             grad_convs = grads[:len(self.backbone_variables)]
@@ -187,8 +193,8 @@ class CANExperiment(Experiment):
             optimizer['backbone'].apply_gradients(zip(grad_convs, self.backbone_variables))
             optimizer['head'].apply_gradients(zip(grad_denses, self.head_variables))
 
-            print('Progress: {}, loss:{}\ncrossentropy_loss: {}, cdd_loss: {}' \
-                  .format(p, loss, crossentropy_loss, cdd_loss))
+            print('Progress: {}, loss:{}\ncrossentropy_loss: {}, cdd_loss: {}, regularization_loss: {}' \
+                  .format(p, loss, crossentropy_loss, cdd_loss, regularization_loss.numpy()))
 
     def __estimate_centers_init(self, source_masked_generator, model, model_layer_ix=0, eps=1e-8):
         features = []

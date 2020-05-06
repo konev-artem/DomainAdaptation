@@ -1,5 +1,6 @@
 import tensorflow as tf
 import tensorflow.keras as keras
+import sys
 
 
 def get_class(kls):
@@ -37,18 +38,25 @@ class DomainSpecificBatchNormalization(keras.layers.Layer):
                        false_fn=lambda: self.trg_bn(inputs))
 
 
-def make_batch_normalization_layers_domain_specific(model, domain_variable, copy_bnorm_weights=True):
+def make_batch_normalization_layers_domain_specific_and_set_regularization(model, domain_variable, copy_bnorm_weights=True,
+                                                                           kernel_regularizer=None, bias_regularizer=None):
     """
     This function replaces all BatchNormalization layers with DomainSpecificBatchNormalization layers.
     You have to manually change domain_variable in order to switch between source and target modes.
+    This function can be also used to set kernel & bias regularizers.
     The weights are copied from old model into new model.
     :param model: Old model
     :param domain_variable: This tf.Variable(dtype=bool) indicates if the layer is used in source or target mode
     :param copy_bnorm_weights: Whether to copy old BatchNormalization weights into new ones
+    :param kernel_regularizer: Instance of tf.keras.regularizers.Regularizer.
+    :param bias_regularizer: Instance of tf.keras.regularizers.Regularizer.
     :return: New model
     """
     layers = []
     layer_name_to_ix = dict()
+
+    kernel_regularizer_cnt = 0
+    bias_regularizer_cnt = 0
 
     for ix, (layer_config, old_layer) in enumerate(zip(model.get_config()['layers'], model.layers)):
         layer_name_to_ix[layer_config['name']] = ix
@@ -69,6 +77,14 @@ def make_batch_normalization_layers_domain_specific(model, domain_variable, copy
             new_layer = DomainSpecificBatchNormalization(domain_variable, bn_config)
         else:
             new_layer = layer_class(**layer_config['config'])
+            for attr, regularizer in zip(['kernel_regularizer', 'bias_regularizer'],
+                                         [kernel_regularizer, bias_regularizer]):
+                if hasattr(new_layer, attr) and regularizer is not None:
+                    setattr(new_layer, attr, regularizer)
+                    if attr == 'kernel_regularizer':
+                        kernel_regularizer_cnt += 1
+                    if attr == 'bias_regularizer':
+                        bias_regularizer_cnt += 1
 
         inputs_names = layer_config['inbound_nodes'][0]
         inputs_names = list(map(lambda x: x[0], inputs_names))
@@ -92,5 +108,8 @@ def make_batch_normalization_layers_domain_specific(model, domain_variable, copy
                 new_model.layers[layer_ix].trg_bn.set_weights(weights)
 
         new_model.layers[layer_ix].trainable = model.layers[layer_ix].trainable
+
+    sys.stderr.write("Successfully set {} kernel_regularizers to {}.\n".format(kernel_regularizer_cnt, kernel_regularizer))
+    sys.stderr.write("Successfully set {} bias_initializers to {}.\n".format(bias_regularizer_cnt, bias_regularizer))
 
     return new_model
