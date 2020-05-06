@@ -26,7 +26,7 @@ class DomainGenerator:
 class MaskedGenerator:
 
     def __init__(self, dataset, mask, batch_size, preprocess_input=lambda x: x / 255.0,
-                 flip_horizontal=False):
+                 flip_horizontal=False, random_crop=(224, 224)):
         """
         Arguments:
 
@@ -44,6 +44,7 @@ class MaskedGenerator:
         self.preprocess_input = preprocess_input
 
         self.flip_horizontal = flip_horizontal
+        self.random_crop = random_crop
 
     def set_mask(self, mask):
 
@@ -59,8 +60,13 @@ class MaskedGenerator:
             x_batch = self.preprocess_input(x_batch)
 
         x_batch, y_batch = tf.convert_to_tensor(x_batch, dtype=tf.float32), tf.convert_to_tensor(y_batch, dtype=tf.int32)
+
         if self.flip_horizontal:
             x_batch = tf.image.random_flip_left_right(x_batch)
+
+        if self.random_crop is not None:
+            x_batch = tf.map_fn(lambda img: tf.image.random_crop(img, [*self.random_crop, 3]), x_batch)
+
         return x_batch, y_batch
 
     def get_batch(self, classes):
