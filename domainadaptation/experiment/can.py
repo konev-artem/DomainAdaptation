@@ -175,7 +175,10 @@ class CANExperiment(Experiment):
                 self.__switch_batchnorm_mode('target')
                 model_output_target = model(X_target)
 
-                regularization_loss = tf.math.add_n(model.losses)
+                if model.losses:
+                    regularization_loss = tf.math.add_n(model.losses)
+                else:
+                    regularization_loss = tf.Variable(0.0)
 
                 probs_source = model_output_source[-1]
                 crossentropy_loss = self._crossentropy_loss(y_source, probs_source, from_logits=False)
