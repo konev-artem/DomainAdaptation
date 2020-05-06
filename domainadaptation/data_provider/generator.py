@@ -25,7 +25,8 @@ class DomainGenerator:
 
 class MaskedGenerator:
 
-    def __init__(self, dataset, mask, batch_size, preprocess_input=lambda x: x / 255.0):
+    def __init__(self, dataset, mask, batch_size, preprocess_input=lambda x: x / 255.0,
+                 flip_horizontal=False):
         """
         Arguments:
 
@@ -42,6 +43,8 @@ class MaskedGenerator:
         self.batch_size = batch_size
         self.preprocess_input = preprocess_input
 
+        self.flip_horizontal = flip_horizontal
+
     def set_mask(self, mask):
 
         assert len(self.mask) == len(mask), 'Wrong length'
@@ -55,7 +58,10 @@ class MaskedGenerator:
         if self.preprocess_input is not None:
             x_batch = self.preprocess_input(x_batch)
 
-        return tf.convert_to_tensor(x_batch, dtype=tf.float32), tf.convert_to_tensor(y_batch, dtype=tf.int32)
+        x_batch, y_batch = tf.convert_to_tensor(x_batch, dtype=tf.float32), tf.convert_to_tensor(y_batch, dtype=tf.int32)
+        if self.flip_horizontal:
+            x_batch = tf.image.random_flip_left_right(x_batch)
+        return x_batch, y_batch
 
     def get_batch(self, classes):
         """ Get batch of given classes according to mask """
