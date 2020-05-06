@@ -73,7 +73,8 @@ class CANExperiment(Experiment):
         
         source_labeled_dataset = LabeledDataset(
             root=os.path.join(self.config["dataset"]["path"], self.config["dataset"]["source"]),
-            img_size=self.config["backbone"]["img_size"][0],
+            # img_size=self.config["backbone"]["img_size"][0],
+            img_size=self.config["img_size_before_crop"][0],
             store_in_ram=True,
             type_label=0
         )
@@ -83,12 +84,14 @@ class CANExperiment(Experiment):
             mask=np.ones(len(source_labeled_dataset)),
             batch_size=self.config["batch_size"] // 2,
             preprocess_input=self._preprocess_input,
-            flip_horizontal=self.config['augmentations']['flip_horizontal']
+            flip_horizontal=self.config['augmentations']['flip_horizontal'],
+            random_crop=self.config["backbone"]["img_size"][:2]
         )
 
         target_labeled_dataset = LabeledDataset(
             root=os.path.join(self.config["dataset"]["path"], self.config["dataset"]["target"]),
-            img_size=self.config["backbone"]["img_size"][0],
+            # img_size=self.config["backbone"]["img_size"][0],
+            img_size=self.config["img_size_before_crop"][0],
             store_in_ram=True,
             type_label=0  # 0 means to read dataset as labeled from folder, bet we ignore this labels
         )  # this is done just to have some initialization
@@ -98,7 +101,8 @@ class CANExperiment(Experiment):
             mask=np.ones(len(target_labeled_dataset)),
             batch_size=self.config["batch_size"] // 2,
             preprocess_input=self._preprocess_input,
-            flip_horizontal=self.config['augmentations']['flip_horizontal']
+            flip_horizontal=self.config['augmentations']['flip_horizontal'],
+            random_crop=self.config["backbone"]["img_size"][:2]
         )
 
         source_test_generator = self.domain_generator.make_generator(
