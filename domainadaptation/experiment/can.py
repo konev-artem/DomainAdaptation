@@ -79,6 +79,7 @@ class CANExperiment(Experiment):
             mask=np.ones(len(source_labeled_dataset)),
             batch_size=self.config["batch_size"] // 2,
             preprocess_input=self._preprocess_input,
+            flip_horizontal=self.config['augmentations']['flip_horizontal']
         )
 
         target_labeled_dataset = LabeledDataset(
@@ -93,6 +94,7 @@ class CANExperiment(Experiment):
             mask=np.ones(len(target_labeled_dataset)),
             batch_size=self.config["batch_size"] // 2,
             preprocess_input=self._preprocess_input,
+            flip_horizontal=self.config['augmentations']['flip_horizontal']
         )
 
         source_test_generator = self.domain_generator.make_generator(
@@ -109,7 +111,6 @@ class CANExperiment(Experiment):
 
         tester = Tester()
 
-        optimizer = keras.optimizers.SGD(learning_rate=self.config['learning_rate'], momentum=0.9)
         p = 0.
 
         self.learning_rate = tf.Variable(self.config['learning_rate'], dtype=tf.float32, trainable=False)
