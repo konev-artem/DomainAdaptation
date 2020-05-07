@@ -163,18 +163,27 @@ class CANExperiment(Experiment):
         # Update target dataset labels with labels obtained from KMeans
         target_labeled_dataset.set_labels(target_y_kmeans)
 
+        all_classes_ixes = list(range(self.config['dataset']['classes']))
+
         for _ in range(K):
             classes_to_use_in_batch = np.random.choice(
                 good_classes,
                 size=min(self.config['MAX_CLASSES_PER_BATCH'], len(good_classes)),
                 replace=False)
 
+            classes_to_use_in_xentropy = np.random.choice(
+                all_classes_ixes,
+                size=self.config['MAX_CLASSES_PER_BATCH'],
+                replace=False)
+
             X_target, y_target = target_masked_generator.get_batch(classes_to_use_in_batch)
             X_source, y_source = source_masked_generator.get_batch(classes_to_use_in_batch)
+            X_source_xentropy, y_source_xentropy = source_masked_generator.get_batch(classes_to_use_in_xentropy)
 
             with tf.GradientTape() as tape:
                 self.__switch_batchnorm_mode('source')
                 model_output_source = model(X_source)
+                model_output_source_xentropy = model(X_source_xentropy)
 
                 self.__switch_batchnorm_mode('target')
                 model_output_target = model(X_target)
@@ -184,8 +193,8 @@ class CANExperiment(Experiment):
                 else:
                     regularization_loss = tf.Variable(0.0)
 
-                probs_source = model_output_source[-1]
-                crossentropy_loss = self._crossentropy_loss(y_source, probs_source, from_logits=False)
+                probs_source = model_output_source_xentropy[-1]
+                crossentropy_loss = self._crossentropy_loss(y_source_xentropy, probs_source, from_logits=False)
 
                 cdd_loss = 0
                 for out_source, out_target in zip(model_output_source, model_output_target):
