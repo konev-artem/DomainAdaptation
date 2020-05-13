@@ -29,8 +29,8 @@ class CANExperiment(Experiment):
         # Parameters for learning rate scheduling
         self._conv_lr0 = 0.001
         self._dense_lr0 = 0.01
-        self._a = 10
-        self._b = 0.75
+        self._a = self.config['a']
+        self._b = self.config['b']
 
         self._backbone_lr_multiplier = 0.1
 
@@ -247,10 +247,14 @@ class CANExperiment(Experiment):
         kmeans = SphericalKMeans()
         y_kmeans, centers, convergence = kmeans.fit_predict(X=features, init=centers_init)
 
-        close_to_center_mask = self.__find_samples_close_to_centers(features, y_kmeans, centers)
-        target_masked_generator.set_mask(close_to_center_mask)
+        if self.config['D_0'] < 1.0:
+            close_to_center_mask = self.__find_samples_close_to_centers(features, y_kmeans, centers)
+            target_masked_generator.set_mask(close_to_center_mask)
 
-        good_classes = self.__find_good_classes(y_kmeans, close_to_center_mask)
+        if self.config['N_0'] != 0:
+            good_classes = self.__find_good_classes(y_kmeans, close_to_center_mask)
+        else:
+            good_classes = np.arange(self.config['dataset']['classes'], dtype=np.int32)
 
         return y_kmeans, centers, convergence, good_classes
 
