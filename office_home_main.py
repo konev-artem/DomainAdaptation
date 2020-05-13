@@ -29,7 +29,7 @@ if __name__ == '__main__':
                     {
                         'type': dataset_type,
                         'num_trainable_layers': num_trainable_layers,
-                        'img-size': img_size,
+                        'img_size': img_size,
                         'weights': weights,
                         'pooling': pooling_type
                     },

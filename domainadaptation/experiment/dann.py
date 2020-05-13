@@ -21,7 +21,7 @@ class DANNExperiment(Experiment):
         #  --- create model ---
         backbone = self._get_new_backbone_instance()
         classifier_head = self._get_classifier_head(num_classes=self.config["dataset"]["classes"])
-        domain_head = self._get_classifier_head(num_classes=2)
+        domain_head = self._get_domain_head(num_classes=2)
 
         lambda_ = tf.Variable(initial_value=0., trainable=False, dtype=tf.float32)
         gradient_reversal_layer = GradientReversal(lambda_)

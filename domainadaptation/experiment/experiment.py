@@ -8,6 +8,8 @@ from domainadaptation.trainer import Trainer
 from domainadaptation.visualizer import Visualizer
 from domainadaptation.data_provider import DomainGenerator
 
+from scipy.signal import hilbert
+
 
 class Experiment:
     class BackboneType(str, Enum):
@@ -88,7 +90,15 @@ class Experiment:
     def _get_classifier_head(num_classes):
 
         return keras.models.Sequential([
-            keras.layers.Dense(units=1024, activation='relu'),
-            keras.layers.Dense(units=1024, activation='relu'),
+            keras.layers.Dense(units=num_classes)
+        ])
+
+    @staticmethod
+    def _get_domain_head(num_classes):
+        return keras.models.Sequential([
+            keras.layers.Dense(1024, activation='relu'),
+            keras.layers.Dropout(0.5),
+            keras.layers.Dense(1024, activation='relu'),
+            keras.layers.Dropout(0.5),
             keras.layers.Dense(units=num_classes)
         ])
