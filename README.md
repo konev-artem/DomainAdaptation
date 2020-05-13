@@ -6,4 +6,4 @@ DANN | VisDa-2017 | ![](/visualization/visda/resnet50_without_domain_adaptation.
 ## Office31
 | Method | A -> W | D -> W | W -> D | A -> D | D -> A | W -> A |
 |:------:|:------:|:------:|:------:|:------:|:------:|:------:|
-|DANN    |0.66    |0.94    |0.95    | 0.70   |0.52    |0.56    |
+|DANN    |0.81    |0.94    |0.95    | 0.75   |0.54    |0.59    |
