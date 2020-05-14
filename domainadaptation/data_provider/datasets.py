@@ -55,7 +55,7 @@ class UnlabeledDataset:
             :param img_size: (int) to what size to resize the images
         """
 
-        img = Image.open(path).resize((img_size, img_size))
+        img = Image.open(path).convert('RGB').resize((img_size, img_size))
         return np.array(img)
 
 
