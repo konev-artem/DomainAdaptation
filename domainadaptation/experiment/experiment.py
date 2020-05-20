@@ -6,8 +6,6 @@ import numpy as np
 import tensorflow as tf
 import tensorflow.keras as keras
 
-from domainadaptation.trainer import Trainer
-from domainadaptation.visualizer import Visualizer
 from domainadaptation.data_provider import DomainGenerator
 
 import domainadaptation.models.alexnet
