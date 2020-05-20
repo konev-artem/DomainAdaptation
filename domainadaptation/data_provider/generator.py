@@ -88,7 +88,7 @@ class MaskedGenerator:
 
         return self._transform(x_batch, y_batch)
 
-    def __call__(self):
+    def __iter__(self):
         """ Iterates through the whole dataset """
 
         x_batch, y_batch = [], []
