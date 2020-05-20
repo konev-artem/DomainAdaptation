@@ -1,4 +1,5 @@
 from enum import Enum
+
 import sys
 
 from domainadaptation.models.alexnet import AlexNet
@@ -13,6 +14,7 @@ from domainadaptation.data_provider import DomainGenerator
 import domainadaptation.models.alexnet
 from domainadaptation.models import AlexNet
 
+import time
 
 class Experiment:
     class BackboneType(str, Enum):
@@ -108,7 +110,6 @@ class Experiment:
 
     @staticmethod
     def _get_classifier_head(num_classes):
-
         return keras.models.Sequential([
             keras.layers.Dense(units=1024, activation='relu'),
             keras.layers.Dense(units=1024, activation='relu'),
