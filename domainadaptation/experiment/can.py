@@ -217,7 +217,7 @@ class CANExperiment(Experiment):
         labels = []
 
         self.__switch_batchnorm_mode('source')
-        for X, y in tqdm.tqdm(source_masked_generator()):
+        for X, y in tqdm.tqdm(source_masked_generator):
             model_output = model(X)[model_layer_ix].numpy()
 
             features.append(model_output)
@@ -238,7 +238,7 @@ class CANExperiment(Experiment):
         features = []
 
         self.__switch_batchnorm_mode('target')
-        for X, _ in tqdm.tqdm(target_masked_generator()):
+        for X, _ in tqdm.tqdm(target_masked_generator):
             model_output = model(X)[model_layer_ix].numpy()
             features.append(model_output)
 
