@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+from matplotlib.colors import CSS4_COLORS
 import numpy as np
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
@@ -36,6 +37,8 @@ class Visualizer:
                          'orchid',
                          'hotpink'],
                  
+                 use_css_colors=False,
+                 
 
                  **kwargs                       # arguments to be passed into T-SNE/PCA constructor
                                                 # for example you n_jobs for T-SNE
@@ -59,8 +62,10 @@ class Visualizer:
         assert len(markers) >= len(np.unique(domains)), 'not enough markers for domains'
         self.markers = markers
         
-        assert len(colors) >= len(np.unique(labels)), 'not enough colors for labels'
         self.colors = colors
+        if use_css_colors:
+            self.colors = list(CSS4_COLORS.keys())
+        assert len(self.colors) >= len(np.unique(labels)), 'not enough colors for labels'
     
     def visualize(self,
                   *args,

@@ -9,6 +9,7 @@ from domainadaptation.tester import Tester
 from domainadaptation.models import GradientReversal
 from domainadaptation.experiment import Experiment
 from domainadaptation.visualizer import Visualizer
+from domainadaptation.utils import get_features_and_labels
 
 from domainadaptation.utils import SphericalKMeans, make_batch_normalization_layers_domain_specific_and_set_regularization
 from domainadaptation.data_provider import LabeledDataset, MaskedGenerator
@@ -143,6 +144,26 @@ class CANExperiment(Experiment):
                 tester.test(test_model, source_test_generator)
                 self.__switch_batchnorm_mode('target')
                 tester.test(test_model, target_test_generator)
+                
+        #  --- visualize features from the last layer of backbone ---
+        source_masked_generator.set_mask(np.ones(len(source_labeled_dataset)))
+        target_masked_generator.set_mask(np.ones(len(target_labeled_dataset)))
+        
+        self.__switch_batchnorm_mode('source')
+        source_features, source_labels = get_features_and_labels(backbone, iter(source_masked_generator), 100000)
+        self.__switch_batchnorm_mode('target')
+        target_features, target_labels = get_features_and_labels(backbone, iter(target_masked_generator), 100000)
+        
+        visualizer = Visualizer(
+            embeddings=np.vstack((source_features,
+                                  target_features)),
+            labels=np.hstack((source_labels,
+                              target_labels)),
+            domains=np.hstack((np.zeros(source_features.shape[0], dtype=int),
+                               np.ones(target_features.shape[0], dtype=int))),
+            **self.config['visualizer']
+        )
+        visualizer.visualize(**self.config['visualize'])
 
     def __perform_can_loop(self, source_masked_generator,
                            target_labeled_dataset, target_masked_generator,
