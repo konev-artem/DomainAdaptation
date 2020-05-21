@@ -149,7 +149,9 @@ class CANExperiment(Experiment):
         source_masked_generator.set_mask(np.ones(len(source_labeled_dataset)))
         target_masked_generator.set_mask(np.ones(len(target_labeled_dataset)))
         
+        self.__switch_batchnorm_mode('source')
         source_features, source_labels = get_features_and_labels(backbone, iter(source_masked_generator), 100000)
+        self.__switch_batchnorm_mode('target')
         target_features, target_labels = get_features_and_labels(backbone, iter(target_masked_generator), 100000)
         
         visualizer = Visualizer(
