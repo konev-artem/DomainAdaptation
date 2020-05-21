@@ -137,15 +137,17 @@ class DANNExperimentOffice31(Experiment):
     link: https://arxiv.org/abs/1505.07818
     """
 
-    def __init__(self, config):
+    def __init__(self, config, num_head_layers=2, dh_coef=1):
         super().__init__(config)
+        self.num_head_layers=num_head_layers
+        self.dh_coef = dh_coef
 
     def __call__(self, train_domain_head=True):
 
         #  --- create model ---
         backbone = self._get_new_backbone_instance()
-        classifier_head = self._get_classifier_head(num_classes=self.config["dataset"]["classes"])
-        domain_head = self._get_classifier_head(num_classes=2)
+        classifier_head = self._get_classifier_head(num_classes=self.config["dataset"]["classes"], num_head_layers=self.num_head_layers)
+        domain_head = self._get_classifier_head(num_classes=2, num_head_layers=self.num_head_layers)
 
         lambda_ = tf.Variable(initial_value=0., trainable=False, dtype=tf.float32)
         gradient_reversal_layer = GradientReversal(lambda_)
@@ -189,7 +191,7 @@ class DANNExperimentOffice31(Experiment):
         #  --- train dann model ---
         optimizer = keras.optimizers.Adam(learning_rate=self.config['learning_rate'])
         steps_per_epoch = len(source_generator)
-
+        best_acc = 0
         for epoch_num in range(self.config["epochs"]):
             print(f"Starting epoch {epoch_num}", time.ctime())
             mean_domain_loss = keras.metrics.MeanTensor()
@@ -211,7 +213,7 @@ class DANNExperimentOffice31(Experiment):
                         mean_domain_loss.update_state(domain_loss)
 
                     if train_domain_head:
-                        total_loss = classification_loss + domain_loss
+                        total_loss = classification_loss + domain_loss * self.dh_coef
                     else:
                         total_loss = classification_loss
 
@@ -241,14 +243,18 @@ class DANNExperimentOffice31(Experiment):
 
             print("Testing on target...")
             tester = Tester()
-            tester.test(
+            acc = tester.test(
                 classification_model,
                 self.domain_generator.make_generator(
+                    use_augmentation=False,
                     domain=self.config["dataset"]["target"],
                     batch_size=self.config["batch_size"],
                     target_size=self.config["backbone"]["img_size"]
                 )
             )
+            best_acc = max(best_acc, np.mean(acc))
+        print("Best testing acc:", best_acc)
+
 
 
 
@@ -258,12 +264,12 @@ class DANNExperimentOffice31(Experiment):
         return 2 / (1 + np.exp(-10 * p)) - 1
 
     @staticmethod
-    def _get_classifier_head(num_classes):
+    def _get_classifier_head(num_classes, num_head_layers=2):
         return keras.models.Sequential([
-            keras.layers.Dense(units=1024, activation='relu'),
-            keras.layers.Dense(units=1024, activation='relu'),
-            keras.layers.Dense(units=1024, activation='relu'),
-            keras.layers.Dense(units=1024, activation='relu'),
-            keras.layers.Dense(units=1024, activation='relu'),
+            *[keras.layers.Dense(units=1024, activation='relu') for i in range(num_head_layers)],
+            # keras.layers.Dense(units=1024, activation='relu'),
+            # keras.layers.Dense(units=1024, activation='relu'),
+            # keras.layers.Dense(units=1024, activation='relu'),
+            # keras.layers.Dense(units=1024, activation='relu'),
             keras.layers.Dense(units=num_classes)
         ])

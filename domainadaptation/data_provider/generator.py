@@ -4,8 +4,9 @@ from tensorflow.keras.preprocessing.image import ImageDataGenerator
 
 class DomainGenerator:
     # you can use image_data_generator_kwargs for augmentation
-    def __init__(self, dataset_dir, **image_data_generator_kwargs):
-        self.datagen = ImageDataGenerator(**image_data_generator_kwargs)
+    def __init__(self, dataset_dir, preprocessing_function, **image_data_generator_kwargs):
+        self.datagen = ImageDataGenerator(preprocessing_function=preprocessing_function, **image_data_generator_kwargs)
+        self.datagen_no_augm = ImageDataGenerator(preprocessing_function=preprocessing_function)
         self.domains = dict()
         with os.scandir(dataset_dir) as it:
             for entry in it:
@@ -15,6 +16,8 @@ class DomainGenerator:
     def get_domain_names(self):
         return list(self.domains.keys())
 
-    def make_generator(self, domain, **generator_kwargs):
+    def make_generator(self, domain, use_augmentation=True, **generator_kwargs):
         dir = self.domains[domain]
-        return self.datagen.flow_from_directory(dir, **generator_kwargs)
+        dg = self.datagen if use_augmentation else self.datagen_no_augm
+        return dg.flow_from_directory(dir, **generator_kwargs)
+
